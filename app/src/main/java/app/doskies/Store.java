@@ -20,9 +20,9 @@ final class Store {
     void setMode(String mode) { prefs.edit().putString("mode", mode).apply(); }
 
     // Stored as float: plenty of precision for weather (~1m at the equator), and
-    // SharedPreferences has no native double. Default is Medford, MA, matching placeLabel().
-    double lat() { return prefs.getFloat("lat", 42.4184f); }
-    double lon() { return prefs.getFloat("lon", -71.1062f); }
+    // SharedPreferences has no native double. Default is Medford, NJ 08055, matching placeLabel().
+    double lat() { return prefs.getFloat("lat", 39.9007f); }
+    double lon() { return prefs.getFloat("lon", -74.8235f); }
     void setLocation(double lat, double lon) {
         prefs.edit().putFloat("lat", (float) lat).putFloat("lon", (float) lon).apply();
     }

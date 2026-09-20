@@ -50,7 +50,8 @@ City search (fixed-location mode only):
 GET https://geocoding-api.open-meteo.com/v1/search?name={q}&count=5&language=en&format=json
 ```
 Returns `results[]{ latitude, longitude, name, admin1, country_code }`. Use it to set both the
-coordinates and the display label so "Medford" ambiguity (OR vs MA) is resolved by the user's pick.
+coordinates and the display label so "Medford" ambiguity is resolved by the user's pick. Default
+fallback is Medford NJ 08055 (39.9007, -74.8235); auto-locate overrides it whenever allowed.
 
 ### WMO weather_code -> condition (author glyphs for these ten buckets)
 
