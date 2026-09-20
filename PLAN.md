@@ -138,3 +138,24 @@ Each task ends green on `scripts/build.ps1` before the next begins.
   round-trips. `build.ps1` green: assembleRelease, testDebugUnitTest, lintRelease. Not yet wired
   into a widget or UI (that is T2-T4); no location resolution yet (T3), so lat/lon default to a
   placeholder (Medford, MA). Next up is T2 (widget scaffolding).
+- 2026-09-20: T2 done. Widget scaffolding added under `app/src/main/java/app/doskies/`:
+  `ForecastWidget` (AppWidgetProvider; STRIP/MEDIUM/LARGE size variants via a RemoteViews SizeF
+  map, mirroring the Cloudflare widget's `UsageWidget`), `RefreshJob` (JobService: periodic ~3h/30m
+  flex only when a widget is placed, immediate `now()`, `cancel()`, runs `Repository.refresh` on
+  Repository's own executor via FutureTask, repaints, then `jobFinished`), `BootReceiver`
+  (reschedules on BOOT_COMPLETED/MY_PACKAGE_REPLACED). Placeholder layouts (plain LinearLayout/
+  TextView, no pixel art; T5 replaces them) are `forecast_widget_strip.xml` and
+  `forecast_widget_card.xml`, both clearly commented as placeholder art. Manifest registers the
+  receiver/service/boot receiver and adds RECEIVE_BOOT_COMPLETED. Renders only from
+  `Store.snapshot()` and never fetches itself; the three states are: no snapshot -> "Waiting"
+  (current_temp "--", no fake forecast); snapshot present + `Store.error()` set -> the last
+  snapshot still renders in full, with the error surfacing on the freshness line instead of the
+  "Updated ..." text (never blanked); snapshot present + no error -> normal render with the
+  freshness line showing an age ("Updated Xm/h/d ago"). Tapping the widget body opens
+  `MainActivity`; tapping `refresh` broadcasts an action `ForecastWidget.onReceive` handles by
+  calling `RefreshJob.now`. 7 new offline Robolectric tests in `ForecastWidgetTest` (per-variant
+  render smoke tests plus the three states; no network, every snapshot is either empty or a
+  labeled fixture matching Weather.demo()'s values serialized to the real response shape) bring
+  the suite to 52 offline test runs total. `build.ps1` green: assembleRelease, testDebugUnitTest,
+  lintRelease. Not yet installable as a widget that *looks* right (placeholder art only, that is
+  T5); no location UI yet (T3); no settings screen yet (T4). Next up is T3 (location).
