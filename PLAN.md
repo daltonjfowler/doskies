@@ -126,3 +126,14 @@ Each task ends green on `scripts/build.ps1` before the next begins.
   no network needed. Placeholder launcher icon and empty MainActivity only; no widget, no data layer,
   no location yet (that is T1-T3). Not yet installable as a real widget. Next up is T1 (data layer).
   Physical-device validation is still Dalton's on the Pixel 7.
+- 2026-09-20: T1 done. Data layer added under `app/src/main/java/app/doskies/`: `Forecast`
+  (current + days[7], unit marker), `Wmo` (code -> Condition, PLAN table labels, UNKNOWN falls
+  back to the CLOUDY glyph but keeps the numeric code), `Weather` (org.json parser + `demo()`),
+  `Repository` (HttpURLConnection fetch with timeouts/size cap/no redirects, `refresh(Context)`
+  keeps the last snapshot on failure), `Store` (SharedPreferences `doskies`: units, mode, lat/lon,
+  placeLabel, snapshot/checked/error; no Keystore, nothing secret). 45 offline JUnit/Robolectric
+  test runs (33 methods; Store's run twice under `@Config(sdk={31,35})`) cover the parse fixture,
+  all ten WMO buckets plus unknown, rounding/clamping, malformed-response rejection, and Store
+  round-trips. `build.ps1` green: assembleRelease, testDebugUnitTest, lintRelease. Not yet wired
+  into a widget or UI (that is T2-T4); no location resolution yet (T3), so lat/lon default to a
+  placeholder (Medford, MA). Next up is T2 (widget scaffolding).
