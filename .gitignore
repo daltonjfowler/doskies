@@ -6,6 +6,9 @@ private/
 *.keystore
 *.jks
 releases/*.zip
+releases/*.apk
+releases/*.apk.idsig
+releases/SHA256SUMS.txt
 .serena/
 # Update host (Phase 2): node_modules and generated public assets (latest.json, the APK)
 updates/node_modules/

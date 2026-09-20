@@ -20,10 +20,11 @@ Worker for this app without Dalton's go-ahead (see PLAN.md, Phase 2).
 - **Location is least-privilege.** Coarse location only, requested at runtime, and the app must
   work with location denied by falling back to a saved place (default Medford). Never block the
   forecast on a permission the user declined.
-- **Visual work is Fable's.** The pixel font choice, the weather glyphs, the palette, the widget
-  composition and any Canvas rendering are done by Fable by hand, not by a build agent. A build
-  agent wires data, layout scaffolding, jobs, storage, tests and the release pipeline, and leaves
-  clearly marked seams for the art pass. See PLAN.md task tags.
+- **Visual work is done by hand in the main loop, never delegated to a build agent.** The pixel
+  font choice, the weather glyphs, the palette, the widget composition and any Canvas rendering are
+  authored by hand (the human-in-the-loop Opus session), not by a Sonnet build agent. A build agent
+  wires data, layout scaffolding, jobs, storage, tests and the release pipeline, and leaves clearly
+  marked seams for the art pass. See PLAN.md task tags.
 - Any bundled font or glyph asset must be openly licensed (SIL OFL, or CC BY / CC BY-SA with
   attribution). Record the license and attribution in CREDITS.md. No "free for personal use only"
   fonts.

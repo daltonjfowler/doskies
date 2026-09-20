@@ -16,7 +16,7 @@ Target device: GrapheneOS on a Pixel 7. Build machine: Windows.
 | Trackers/ads | None, ever. That is the reason this project exists. |
 | Location | Coarse only, asked at runtime, optional. Denied -> falls back to a saved place. |
 | Surface | A resizable Android home-screen widget, plus a small settings/host app. |
-| Look | DOS/pixel. Bitmap pixel font + hand-drawn pixel weather glyphs. Fable's work. |
+| Look | DOS/pixel. Bitmap pixel font + hand-drawn pixel weather glyphs. Hand-authored. |
 | Distribution | Self-hosted APK + in-app updater (Phase 2, Dalton-gated). No Play Store. |
 
 ## Architecture (mirrors the Cloudflare Usage Widget, minus all the secret-handling)
@@ -69,7 +69,8 @@ coordinates and the display label so "Medford" ambiguity (OR vs MA) is resolved 
 
 ## Task order (sequential; one build agent at a time; the local gate is free)
 
-Tags: **[Sonnet]** mechanical plumbing/tests/pipeline. **[Fable]** visual/art, done by hand.
+Tags: **[Sonnet]** mechanical plumbing/tests/pipeline, run as workflow build agents (1-2 at a time).
+**[Hand]** visual/art, authored by hand in the main loop (Opus), never delegated to a build agent.
 Each task ends green on `scripts/build.ps1` before the next begins.
 
 - **T0 [Sonnet] Skeleton + toolchain.** Provision `.tools/` (copy the JDK+SDK from the Cloudflare
@@ -95,13 +96,13 @@ Each task ends green on `scripts/build.ps1` before the next begins.
   refresh, labeled demo toggle, about/credits, and a clearly marked seam for widget appearance the
   art pass will own. **Gate:** `build.ps1` green.
 
-- **T5 [Fable] The look.** Bundled openly-licensed pixel/DOS font, ten hand-drawn pixel weather
+- **T5 [Hand] The look.** Bundled openly-licensed pixel/DOS font, ten hand-drawn pixel weather
   glyphs, palette, widget composition. Likely a Canvas-to-Bitmap render of the forecast "screen"
   for true pixel fidelity, with invisible tap regions overlaid for open/refresh. Replace the
   placeholder layouts. Update CREDITS.md with font + any asset licenses. **Done by hand, not delegated.**
 
 - **T6 [Sonnet] Release pipeline + docs.** `ensure-signing.ps1`, `build.ps1`, `ship.ps1`,
-  `verify-apk.ps1`; README with real screenshots; final icon (Fable). **Gate:** signed APK in
+  `verify-apk.ps1`; README with real screenshots; final icon (hand). **Gate:** signed APK in
   `releases/`, `build.ps1` green.
 
 - **Phase 2 [Dalton-gated] Updater + host.** `updates/` Worker serving `latest.json` + the APK,
@@ -112,10 +113,16 @@ Each task ends green on `scripts/build.ps1` before the next begins.
 
 - Repo visibility: starting **private**. Say the word to make it public.
 - Units default **Fahrenheit** with a Celsius toggle. Change the default if you prefer.
-- Widget appearance knobs (accent/opacity) or a single fixed DOS palette: Fable will propose in T5.
+- Widget appearance knobs (accent/opacity) or a single fixed DOS palette: decided in the T5 art pass.
 
 ## Handoff status
 
 - 2026-09-20: Repo scaffolded (this plan, AGENTS.md, .gitignore, README). No app code yet. Next up
   is T0. Build machine is Windows; physical-device validation (adding the widget, the location
   prompt, real APK install) is Dalton's on the Pixel 7.
+- 2026-09-20: T0 done. Skeleton builds and gates green (`scripts/build.ps1`: assembleRelease,
+  testDebugUnitTest, lintRelease all pass; `releases/DOSkies.apk` staged). `.tools/` toolchain
+  (JDK, Android SDK, warmed Gradle cache) copied locally from the Cloudflare widget's, self-contained,
+  no network needed. Placeholder launcher icon and empty MainActivity only; no widget, no data layer,
+  no location yet (that is T1-T3). Not yet installable as a real widget. Next up is T1 (data layer).
+  Physical-device validation is still Dalton's on the Pixel 7.

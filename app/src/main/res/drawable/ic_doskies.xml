@@ -1,0 +1,9 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+    <!-- placeholder launcher icon: dark DOS-green background, a pixel sun peeking over a pixel cloud -->
+    <!-- background: dark green, matches the widget card -->
+    <path android:fillColor="#111916" android:pathData="M0,0h48v48h-48z" />
+    <!-- pixel sun, orange blocks -->
+    <path android:fillColor="#FFBA7A" android:pathData="M18,10h4v4h-4z M26,10h4v4h-4z M14,14h4v4h-4z M30,14h4v4h-4z M18,14h12v4h-12z M14,18h20v6h-20z M18,24h12v4h-12z" />
+    <!-- pixel cloud, light blue-grey, overlapping the sun's base -->
+    <path android:fillColor="#ADBBB2" android:pathData="M10,30h6v4h-6z M34,30h6v4h-6z M14,26h20v4h-20z M10,34h30v4h-30z" />
+</vector>
