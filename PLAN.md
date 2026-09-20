@@ -159,3 +159,32 @@ Each task ends green on `scripts/build.ps1` before the next begins.
   the suite to 52 offline test runs total. `build.ps1` green: assembleRelease, testDebugUnitTest,
   lintRelease. Not yet installable as a widget that *looks* right (placeholder art only, that is
   T5); no location UI yet (T3); no settings screen yet (T4). Next up is T3 (location).
+- 2026-09-20: T3 done. Location added under `app/src/main/java/app/doskies/`: `Locator`
+  (coarse-only, `LocationManager` alone, no Play services) with `hasLocationPermission(Context)`;
+  `getCoarseFix(Context)` checks the enabled NETWORK/PASSIVE/GPS/FUSED providers for the
+  freshest cached fix within 30 minutes, else one bounded (8s) `requestSingleUpdate`, off the
+  main thread, null on any miss; `reverseLabel(Context, lat, lon)` returns a "City" or
+  "City, State" label only when `Geocoder.isPresent()`, else null, guarded so it never throws;
+  and two pure, Android-free decision functions, `resolveCoordinates(mode, hasPermission, fix,
+  storedLat, storedLon)` (fixed always stored; auto uses the fix only with permission and a fix
+  in hand, else stored) and `resolveLabel(geocoderPresent, reverseLabel, storedLabel)` (falls
+  back to the stored label unless the geocoder is present and actually returned something).
+  `Geocoding` adds Open-Meteo city search: `search(query)` (`HttpURLConnection`, timeouts, 1MB
+  cap, no redirects) and a network-free `parse(json)` returning `Result{lat, lon, name, admin1,
+  countryCode}`; a response with no "results" key parses as an empty list (Open-Meteo's real
+  shape for zero matches), malformed JSON throws. `Repository.refresh` now best-effort updates
+  Store's coordinates (and label) from a coarse fix in auto mode before fetching, wrapped so any
+  location failure falls through to fetching with whatever coordinates Store already has; fixed
+  mode is untouched. `MainActivity` requests `ACCESS_COARSE_LOCATION` on launch only in auto mode
+  without it yet, and kicks a refresh on either outcome of the request, never blocking on denial.
+  20 new offline JUnit/Robolectric test runs (9 `LocatorTest` covering every resolveCoordinates
+  and resolveLabel branch, no Robolectric needed since both are pure; 2 `LocatorPermissionTest`
+  for `hasLocationPermission`'s default-denied/granted-after-shadow-grant against a real
+  Robolectric `PackageManager`; 9 `GeocodingTest` for the fixture parse, the no-"results"-key and
+  empty-array cases, an admin1-absent default, a partial-entry skip, and two malformed-JSON
+  throws) bring the suite to 72 offline test runs total. `build.ps1` green: assembleRelease,
+  testDebugUnitTest, lintRelease. No Google Play services or Fused Location anywhere; only
+  `ACCESS_COARSE_LOCATION` is requested, never fine. No settings UI yet to change location mode
+  or run a city search by hand (that is T4); live-device validation (the permission prompt, a
+  real fix, GrapheneOS's Geocoder absence) is still Dalton's on the Pixel 7. Next up is T4
+  (settings app).
