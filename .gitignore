@@ -1,0 +1,14 @@
+.tools/
+.gradle/
+local.properties
+**/build/
+private/
+*.keystore
+*.jks
+releases/*.zip
+.serena/
+# Update host (Phase 2): node_modules and generated public assets (latest.json, the APK)
+updates/node_modules/
+updates/public/*
+!updates/public/.gitkeep
+!updates/public/index.html
