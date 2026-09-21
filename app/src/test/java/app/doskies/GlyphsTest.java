@@ -42,10 +42,11 @@ public class GlyphsTest {
     }
 
     @Test public void clearGlyphHasItsSpecCells() {
-        // CLEAR row 5 is "YY YYYYYY YY": Y at col 0, space at col 2 (spec-authoritative).
+        // CLEAR row 5 is "Y YYYYYYYY Y": a west ray at col 0, a gap at col 1, the solid disc from col 2.
         String[] clear = Glyphs.grid(Wmo.Condition.CLEAR);
         assertEquals('Y', clear[5].charAt(0));
-        assertEquals(' ', clear[5].charAt(2));
+        assertEquals(' ', clear[5].charAt(1));
+        assertEquals('Y', clear[5].charAt(2));
     }
 
     @Test public void codeSelectionUsesConditionNotGlyphBucket() {

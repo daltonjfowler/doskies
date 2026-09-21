@@ -84,6 +84,12 @@ final class Store {
     boolean demo() { return prefs.getBoolean("demo", false); }
     void setDemo(boolean on) { prefs.edit().putBoolean("demo", on).apply(); }
 
+    /** Widget panel background opacity, 10..100 percent (clamped so it is never fully invisible). */
+    int widgetOpacity() { return Math.max(10, Math.min(100, prefs.getInt("widget_opacity", 100))); }
+    void setWidgetOpacity(int percent) {
+        prefs.edit().putInt("widget_opacity", Math.max(10, Math.min(100, percent))).apply();
+    }
+
     // ---- Phase 2: self-hosted updates -----------------------------------------
 
     /** The update host base URL; defaults to Dalton's own, no account or device id in it. */

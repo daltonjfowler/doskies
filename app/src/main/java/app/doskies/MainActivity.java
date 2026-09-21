@@ -15,6 +15,7 @@ import android.view.ViewParent;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.SeekBar;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
@@ -227,9 +228,39 @@ public final class MainActivity extends Activity {
      * configures that look yet; this card is a placeholder for whatever knobs T5 decides it wants
      * (or none, if the palette ends up fixed). Do not add art-pass logic above this comment. */
     private void buildAppearanceSeam(LinearLayout page) {
+        Store s = new Store(this);
         LinearLayout box = card(page);
         text(box, "WIDGET APPEARANCE", 11, orange, false);
-        text(box, "The DOS/pixel look ships in a later, hand-authored pass. Nothing to configure here yet.", 12, muted, false);
+
+        LinearLayout row = row(box);
+        TextView label = new TextView(this);
+        label.setText("Background opacity");
+        label.setTextSize(14);
+        label.setTextColor(ink);
+        row.addView(label, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        final TextView value = new TextView(this);
+        value.setTextSize(14);
+        value.setTextColor(muted);
+        value.setText(s.widgetOpacity() + "%");
+        row.addView(value);
+
+        SeekBar bar = new SeekBar(this);
+        bar.setMin(10);
+        bar.setMax(100);
+        bar.setProgress(s.widgetOpacity());
+        bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                int v = Math.max(10, progress);
+                value.setText(v + "%");
+                new Store(MainActivity.this).setWidgetOpacity(v);
+                ForecastWidget.updateAll(MainActivity.this); // live preview on the home screen
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+        box.addView(bar, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        text(box, "Lower it to let the wallpaper show through the panel.", 12, muted, false);
     }
 
     private void buildAboutCard(LinearLayout page) {

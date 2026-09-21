@@ -69,9 +69,9 @@ final class Glyphs {
     // ---- the ten grids (12 rows x 12 chars), transcribed verbatim from docs/T5-LOOK-SPEC.md ----
 
     private static final String[] CLEAR = {
-        "     YY     ", "  Y  YY  Y  ", "   YYYYYY   ", "  YYYYYYYY  ", " YYYYYYYYYY ",
-        "YY YYYYYY YY", "YY YYYYYY YY", " YYYYYYYYYY ", "  YYYYYYYY  ", "   YYYYYY   ",
-        "  Y  YY  Y  ", "     YY     "
+        "     YY     ", "  Y      Y  ", "    YYYY    ", "  YYYYYYYY  ", "  YYYYYYYY  ",
+        "Y YYYYYYYY Y", "Y YYYYYYYY Y", "  YYYYYYYY  ", "  YYYYYYYY  ", "    YYYY    ",
+        "  Y      Y  ", "     YY     "
     };
     private static final String[] PARTLY = {
         " YY         ", "Y YY Y      ", " YYYY       ", "YYYYYY WWW  ", " YYYY WWWWW ",

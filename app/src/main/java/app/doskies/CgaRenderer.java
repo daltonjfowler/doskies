@@ -61,6 +61,7 @@ final class CgaRenderer {
         String status = "";     // freshness or error text (title-adjacent line)
         boolean statusIsError;  // draw status in BAD
         boolean demo;
+        int opacity = 100;      // panel background opacity, 10..100 percent
     }
 
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -81,7 +82,11 @@ final class CgaRenderer {
         int w = Math.max(1, wPx), h = Math.max(1, hPx);
         Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         Canvas cv = new Canvas(bmp);
-        cv.drawColor(PANEL);
+        // Panel fill at the chosen opacity; the border and content are drawn opaque on top, so only
+        // the navy ground goes translucent and the wallpaper shows through behind it.
+        int op = Math.max(10, Math.min(100, scr.opacity));
+        int alpha = Math.round(op / 100f * 255f);
+        cv.drawColor((alpha << 24) | (PANEL & 0x00FFFFFF));
         drawBorder(cv, w, h);
 
         float pad = 3f * d + 6f * d; // border thickness + inner margin
@@ -217,7 +222,7 @@ final class CgaRenderer {
             float csz = Math.max(13f, availH * 0.14f);
             text.setColor(ACCENT);
             drawLeft(cv, (scr.demo ? "DEMO " : "") + Wmo.label(f.current.code), left, top + gsz + csz, csz);
-            drawStatsStacked(cv, f, left, top + gsz + csz + 2f * d, Math.max(12f, availH * 0.115f), nowRight - left);
+            drawStatsStacked(cv, f, left, top + gsz + csz + 3f * d, Math.max(15f, availH * 0.15f), nowRight - left);
         }
 
         // vertical dashed rule
@@ -295,12 +300,13 @@ final class CgaRenderer {
         // day rows
         int n = Math.min(rows, f.days.length);
         float rowH = (bottom - y) / Math.max(1, n);
-        float rsz = Math.max(12f, rowH * 0.6f);
-        float gcol = left + rsz * 3.2f;         // day-of-week column width
+        float rsz = Math.max(13f, rowH * 0.66f);
+        float gcol = left + rsz * 3.0f;         // day-of-week column width
         float glyphSz = Math.min(rowH * 0.82f, rsz * 1.5f);
         for (int i = 0; i < n; i++) {
             Forecast.Day day = f.days[i];
             float ry = y + rowH * i;
+            text.setTextSize(rsz);
             float base = ry + rowH * 0.5f - (text.getFontMetrics().ascent + text.getFontMetrics().descent) / 2f;
             text.setColor(TITLE);
             drawLeft(cv, dow(day.date), left, base, rsz);
@@ -309,9 +315,18 @@ final class CgaRenderer {
             text.setColor(VALUE);
             tx = drawLeft(cv, day.hi + "°", tx, base, rsz);
             text.setColor(DIM);
-            drawLeft(cv, " " + day.lo + "°", tx, base, rsz);
+            tx = drawLeft(cv, " " + day.lo + "°", tx, base, rsz);
+            String pct = day.precipChancePct + "%";
+            float precipW = measure(pct, rsz);
             text.setColor(day.precipChancePct >= 25 ? ACCENT : FAINT);
-            drawRight(cv, day.precipChancePct + "%", right, base, rsz);
+            drawRight(cv, pct, right, base, rsz);
+            // The condition word fills the empty middle of a wide row; skipped if the row is too narrow.
+            String cond = Wmo.label(day.code);
+            float condRight = right - precipW - 12f * d;
+            if (condRight - tx > measure(cond, rsz) + 10f * d) {
+                text.setColor(ACCENT);
+                drawRight(cv, cond, condRight, base, rsz);
+            }
         }
     }
 
@@ -323,7 +338,7 @@ final class CgaRenderer {
         if (c.uvMax < 0) {
             x = seg(cv, "-- ", x, baseline, size, FAINT);
         } else {
-            x = seg(cv, c.uvMax + "/11 ", x, baseline, size, VALUE);
+            x = seg(cv, c.uvMax + " ", x, baseline, size, VALUE);
             x = seg(cv, uvBand(c.uvMax) + "  ", x, baseline, size, uvColor(c.uvMax));
         }
         x = seg(cv, "HUM ", x, baseline, size, TITLE);
@@ -336,7 +351,7 @@ final class CgaRenderer {
     private void drawStatsStacked(Canvas cv, Forecast f, float x, float top, float size, float maxW) {
         Forecast.Current c = f.current;
         // Scale down so the widest stat line fits the now-block width (maxW).
-        String uvLine = "UV " + (c.uvMax < 0 ? "--" : (c.uvMax + "/11 " + uvBand(c.uvMax)));
+        String uvLine = "UV " + (c.uvMax < 0 ? "--" : (c.uvMax + " " + uvBand(c.uvMax)));
         String humLine = "HUM " + (c.humidity < 0 ? "--" : (c.humidity + "%"));
         String windLine = "WIND " + (c.wind < 0 ? "--" : (c.wind + " " + c.windUnit));
         float widest = Math.max(measure(uvLine, size), Math.max(measure(humLine, size), measure(windLine, size)));
@@ -344,7 +359,7 @@ final class CgaRenderer {
         float y = top + size;
         float xx = seg(cv, "UV ", x, y, size, TITLE);
         if (c.uvMax < 0) seg(cv, "--", xx, y, size, FAINT);
-        else { xx = seg(cv, c.uvMax + "/11 ", xx, y, size, VALUE); seg(cv, uvBand(c.uvMax), xx, y, size, uvColor(c.uvMax)); }
+        else { xx = seg(cv, c.uvMax + " ", xx, y, size, VALUE); seg(cv, uvBand(c.uvMax), xx, y, size, uvColor(c.uvMax)); }
         y += size + 1f * d;
         xx = seg(cv, "HUM ", x, y, size, TITLE);
         seg(cv, Forecast.Current.display(c.humidity) + (c.humidity < 0 ? "" : "%"), xx, y, size, VALUE);

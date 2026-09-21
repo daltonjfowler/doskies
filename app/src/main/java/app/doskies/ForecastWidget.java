@@ -113,6 +113,7 @@ public final class ForecastWidget extends AppWidgetProvider {
     static CgaRenderer.Screen screen(Context c) {
         Store s = new Store(c);
         CgaRenderer.Screen scr = new CgaRenderer.Screen();
+        scr.opacity = s.widgetOpacity();
 
         if (s.demo()) {
             scr.place = s.placeLabel().toUpperCase(Locale.US);
