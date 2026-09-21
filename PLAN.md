@@ -188,3 +188,36 @@ Each task ends green on `scripts/build.ps1` before the next begins.
   or run a city search by hand (that is T4); live-device validation (the permission prompt, a
   real fix, GrapheneOS's Geocoder absence) is still Dalton's on the Pixel 7. Next up is T4
   (settings app).
+- 2026-09-20: T4 done. `MainActivity` is now a plain, functional settings/host screen (framework
+  Activity + framework Views only, matching the Cloudflare Usage Widget's style; no androidx, no
+  Material Components, no view binding, no new runtime dependency): a ScrollView of cards for
+  Status (place label plus last-updated/error, and a manual "Refresh now" button with a brief
+  "Refreshing..." acknowledgement), Units (a Switch, F/C, wired to `Store.setUnits` + immediate
+  `RefreshJob.now` since Open-Meteo returns temperatures already converted), Location (a RadioGroup
+  auto/fixed wired to `Store.setMode` + `RefreshJob.now`; auto requests `ACCESS_COARSE_LOCATION` if
+  not yet granted; fixed reveals a city search: an EditText + button call `Geocoding.search` off
+  the main thread on `Repository.IO`, list the candidates as simple result buttons, and picking one
+  calls `Store.setLocation` + `Store.setPlaceLabel` + `RefreshJob.now`; empty query, zero results,
+  and a search failure each show a clear message and never crash), Demo mode (a Switch wired to a
+  new `Store.demo()`/`setDemo(boolean)`, explicit and off by default), a commented WIDGET
+  APPEARANCE seam for the T5 art pass (nothing to configure yet), and About (app name +
+  `BuildConfig.VERSION_NAME`, a one-line privacy statement, and Open-Meteo attribution referencing
+  the new root `CREDITS.md`). `ForecastWidget.render` now checks `Store.demo()` first: when on, it
+  renders `Weather.demo()` regardless of any real snapshot, with a "DEMO" marker (prefixed on
+  `title` for MEDIUM/LARGE, on `current_cond` for STRIP since it has no title row) and a "Demo
+  data, not live" freshness line; `Repository.refresh` short-circuits to a no-op success in demo
+  mode, so no network call is made and Store's snapshot/checked/error are left untouched. Demo is
+  never a fallback for a failed live fetch: it is only ever set by this explicit toggle, and a
+  failed fetch with demo off still keeps the last snapshot (or the Waiting state) plus the error,
+  exactly as before T4. 17 new offline JUnit/Robolectric test runs (10 `MainActivitySettingsTest`
+  covering every control's exact Store-key wiring, the RadioGroup revealing/hiding city search, a
+  geocoding-result selection and a full parsed-fixture-to-click flow with no network, empty-query
+  and zero-result messaging, the refresh acknowledgement, and the status/freshness text; 5 new
+  `ForecastWidgetTest` cases for the demo marker on both non-STRIP and STRIP variants, demo
+  overriding a stale real snapshot/error, and demo-off never substituting demo data whether or not
+  a snapshot exists; 2 new `RepositoryTest` cases for the demo no-op) bring the suite to 89 offline
+  test runs total. `build.ps1` green: assembleRelease, testDebugUnitTest, lintRelease. Not yet the
+  final DOS/pixel look (placeholder layouts and a plain settings screen only; that is T5);
+  live-device validation (the permission prompt, a real city search, GrapheneOS's Geocoder
+  absence, actually resizing and reading the widget) is still Dalton's on the Pixel 7. Next up is
+  T5 (the look, done by hand).

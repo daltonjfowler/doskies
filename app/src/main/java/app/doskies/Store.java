@@ -43,4 +43,13 @@ final class Store {
     void setError(String message) { prefs.edit().putString("error", message).apply(); }
     /** Clears a stale error without discarding the snapshot it was attached to. */
     void clear() { prefs.edit().remove("error").apply(); }
+
+    /**
+     * Explicit, user-chosen demo mode: the widget renders Weather.demo() with a visible DEMO
+     * marker instead of Store's real snapshot, and Repository.refresh makes no network call while
+     * this is on. Defaults off. Never set automatically on a failed fetch; that would turn a real
+     * outage into a quiet, confident lie (see AGENTS.md).
+     */
+    boolean demo() { return prefs.getBoolean("demo", false); }
+    void setDemo(boolean on) { prefs.edit().putBoolean("demo", on).apply(); }
 }

@@ -131,4 +131,57 @@ public class ForecastWidgetTest {
         assertTrue(widget.findViewById(R.id.card).isClickable());
         assertTrue(widget.findViewById(R.id.refresh).isClickable());
     }
+
+    // ---- demo mode (Store.demo(), an explicit user choice from MainActivity's T4 toggle) ----
+
+    @Test public void demoModeShowsWeatherDemoWithAVisibleMarkerEvenWithNoSnapshot() {
+        // No snapshot at all: without demo mode this would be the Waiting state (see
+        // noSnapshotShowsWaiting above). With demo on, it must show Weather.demo() instead.
+        new Store(c).setDemo(true);
+        View widget = measure(c, ForecastWidget.Variant.LARGE, 180, 250);
+        assertEquals("71°F", text(widget, R.id.current_temp)); // Weather.demo()'s current temp
+        assertTrue("title should carry a DEMO marker", text(widget, R.id.title).contains("DEMO"));
+        assertEquals("Demo data, not live", text(widget, R.id.freshness));
+        assertEquals(View.VISIBLE, widget.findViewById(R.id.day_0).getVisibility());
+    }
+
+    @Test public void demoModeOnStripMarksTheConditionLineSinceThereIsNoTitleThere() {
+        new Store(c).setDemo(true);
+        View widget = measure(c, ForecastWidget.Variant.STRIP, 110, 40);
+        assertTrue(text(widget, R.id.current_cond).startsWith("DEMO"));
+    }
+
+    @Test public void demoModeIgnoresAnyRealSnapshotOrError() {
+        Store s = new Store(c);
+        s.setDemo(true);
+        s.setSnapshot(DEMO_SNAPSHOT);
+        s.setError("Could not refresh. Check your connection.");
+        View widget = measure(c, ForecastWidget.Variant.LARGE, 180, 250);
+        // Demo mode always wins over whatever is in Store: no error text leaks through.
+        assertEquals("Demo data, not live", text(widget, R.id.freshness));
+    }
+
+    @Test public void demoOffAndNoSnapshotNeverShowsDemoDataEvenWithAnError() {
+        // The core AGENTS.md rule: a failed fetch must never be papered over with demo data.
+        Store s = new Store(c);
+        s.setError("Could not refresh. Check your connection.");
+        assertFalse(s.demo());
+        View widget = measure(c, ForecastWidget.Variant.LARGE, 180, 250);
+        assertEquals("--", text(widget, R.id.current_temp)); // Waiting, not Weather.demo()'s 71
+        assertEquals("Waiting", text(widget, R.id.current_cond));
+        assertEquals(View.GONE, widget.findViewById(R.id.day_0).getVisibility());
+    }
+
+    @Test public void demoOffKeepsLastSnapshotAndErrorInsteadOfDemoData() {
+        Store s = new Store(c);
+        s.setSnapshot(DEMO_SNAPSHOT);
+        s.setError("Could not refresh. Check your connection.");
+        assertFalse(s.demo());
+        View widget = measure(c, ForecastWidget.Variant.LARGE, 180, 250);
+        // Renders the real last snapshot (Repository never blanks it on failure), with the error
+        // on the freshness line, not the demo marker or demo's own freshness text.
+        assertFalse("title must not carry a DEMO marker when demo mode is off",
+            text(widget, R.id.title).contains("DEMO"));
+        assertEquals("Could not refresh. Check your connection.", text(widget, R.id.freshness));
+    }
 }

@@ -100,9 +100,18 @@ public final class ForecastWidget extends AppWidgetProvider {
         return rv;
     }
 
-    /** Fills the widget from Store's last snapshot only. Never fetches here; the refresh job does that. */
+    /**
+     * Fills the widget from Store's last snapshot only. Never fetches here; the refresh job does
+     * that. Demo mode (Store.demo(), an explicit user choice, see MainActivity) is the one
+     * exception: it always renders Weather.demo() instead of the real snapshot, marked DEMO so it
+     * is never mistaken for a live forecast, and skips the error/snapshot states entirely.
+     */
     private static void render(Context c, RemoteViews rv, Variant v) {
         Store s = new Store(c);
+        if (s.demo()) {
+            renderForecast(rv, v, Weather.demo(), s, true);
+            return;
+        }
         String snapshot = s.snapshot();
         if (snapshot.isEmpty()) {
             renderWaiting(rv, v, s);
@@ -111,7 +120,7 @@ public final class ForecastWidget extends AppWidgetProvider {
         try {
             char unit = s.units().length() > 0 ? s.units().charAt(0) : 'F';
             Forecast f = Weather.parse(snapshot, unit);
-            renderForecast(rv, v, f, s);
+            renderForecast(rv, v, f, s, false);
         } catch (Exception e) {
             // A stored snapshot should always parse (Repository validates before storing), but a
             // corrupt or hand-edited SharedPreferences value must never crash the widget.
@@ -135,14 +144,19 @@ public final class ForecastWidget extends AppWidgetProvider {
      * A snapshot is present, so it renders regardless of Store.error(): a failed refresh must
      * never blank the last good forecast. When an error is set it takes the freshness line's
      * place instead of the normal "Updated ..." text, so the user still sees something is wrong.
+     *
+     * <p>{@code demo} marks a Weather.demo() forecast (Store.demo() on): STRIP has no title row to
+     * carry a marker, so it prefixes current_cond instead; every other variant prefixes the title.
+     * The freshness line always reads "Demo data" rather than a checked time or error, since a
+     * demo forecast has neither.
      */
-    private static void renderForecast(RemoteViews rv, Variant v, Forecast f, Store s) {
+    private static void renderForecast(RemoteViews rv, Variant v, Forecast f, Store s, boolean demo) {
         rv.setTextViewText(R.id.current_temp, f.current.temp + "°" + f.unit);
-        rv.setTextViewText(R.id.current_cond, Wmo.label(f.current.code));
-        String status = s.error().isEmpty() ? checkedText(s.checked()) : s.error();
-        setFreshness(rv, v, status);
+        String cond = Wmo.label(f.current.code);
+        rv.setTextViewText(R.id.current_cond, demo && v == Variant.STRIP ? "DEMO " + cond : cond);
+        setFreshness(rv, v, demo ? "Demo data, not live" : (s.error().isEmpty() ? checkedText(s.checked()) : s.error()));
         if (v != Variant.STRIP) {
-            rv.setTextViewText(R.id.title, s.placeLabel());
+            rv.setTextViewText(R.id.title, demo ? "DEMO · " + s.placeLabel() : s.placeLabel());
             if (v == Variant.LARGE) showDays(rv, f); else hideDays(rv);
         }
     }
@@ -179,7 +193,8 @@ public final class ForecastWidget extends AppWidgetProvider {
         }
     }
 
-    private static String checkedText(long checkedAt) {
+    /** Package-visible (not private) so MainActivity's status line can share this exact wording. */
+    static String checkedText(long checkedAt) {
         if (checkedAt <= 0) return "Not checked yet";
         long ageMs = System.currentTimeMillis() - checkedAt;
         if (ageMs < 60_000L) return "Updated just now";

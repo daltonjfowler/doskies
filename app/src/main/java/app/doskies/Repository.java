@@ -64,10 +64,18 @@ final class Repository {
      * mode the stored coordinates are used unchanged. On a successful fetch, stores the new
      * snapshot, checked time, and clears any error. On failure, keeps the last snapshot untouched
      * and records a clear error string; the forecast is never blanked.
+     *
+     * <p>Demo mode (an explicit, labeled user choice; see Store.demo()) short-circuits all of
+     * this: no location lookup, no network call, nothing written to Store. ForecastWidget reads
+     * Store.demo() itself and renders Weather.demo() with a DEMO marker; this method's only job
+     * when demo is on is to do nothing so the repaint that follows has nothing stale to react to.
+     * Demo must never be substituted here for a failed live fetch (AGENTS.md); it is only ever
+     * turned on by MainActivity's explicit toggle.
      */
     static boolean refresh(Context context) {
         synchronized (LOCK) {
             Store s = new Store(context);
+            if (s.demo()) return true; // no network call in demo mode; the widget renders Weather.demo() itself
             updateLocationIfAuto(context, s);
             try {
                 char unit = s.units().length() > 0 ? s.units().charAt(0) : 'F';
