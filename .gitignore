@@ -10,8 +10,10 @@ releases/*.apk
 releases/*.apk.idsig
 releases/SHA256SUMS.txt
 .serena/
-# Update host (Phase 2): node_modules and generated public assets (latest.json, the APK)
+# Update host (Phase 2): node_modules, wrangler local state/cache, and generated public assets
 updates/node_modules/
+updates/.wrangler/
+.wrangler/
 updates/public/*
 !updates/public/.gitkeep
 !updates/public/index.html
