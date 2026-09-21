@@ -134,8 +134,14 @@ final class CgaRenderer {
         float iconCx = right - iconR;
         float iconCy = top + size * 0.42f;
         drawRefreshIcon(cv, iconCx, iconCy, iconR);
+        float rx = iconCx - iconR - 4f * d;
         text.setColor(VALUE);
-        drawRight(cv, scr.place, iconCx - iconR - 4f * d, baseline, size);
+        drawRight(cv, scr.place, rx, baseline, size);
+        if (scr.statusIsError) { // a compact error marker even where the full message will not fit
+            float pw = measure(scr.place, size);
+            text.setColor(BAD);
+            drawRight(cv, "!", rx - pw - 5f * d, baseline, size);
+        }
         // rule beneath
         float ruleY = top + size + 3f * d;
         stroke.setColor(EDGE);
@@ -179,6 +185,10 @@ final class CgaRenderer {
             x += 6f * d;
             text.setColor(ACCENT);
             drawLeft(cv, (scr.demo ? "DEMO " : "") + Wmo.label(f.current.code), x, baseline, size * 0.86f);
+        }
+        if (scr.statusIsError) {
+            text.setColor(BAD);
+            drawRight(cv, "!", right - size * 0.95f, baseline, size);
         }
         drawRefreshIcon(cv, right - size * 0.5f, h / 2f, size * 0.42f);
     }
@@ -324,8 +334,13 @@ final class CgaRenderer {
 
     private void drawStatsStacked(Canvas cv, Forecast f, float x, float top, float size, float maxW) {
         Forecast.Current c = f.current;
+        // Scale down so the widest stat line fits the now-block width (maxW).
+        String uvLine = "UV " + (c.uvMax < 0 ? "--" : (c.uvMax + "/11 " + uvBand(c.uvMax)));
+        String humLine = "HUM " + (c.humidity < 0 ? "--" : (c.humidity + "%"));
+        String windLine = "WIND " + (c.wind < 0 ? "--" : (c.wind + " " + c.windUnit));
+        float widest = Math.max(measure(uvLine, size), Math.max(measure(humLine, size), measure(windLine, size)));
+        if (maxW > 0 && widest > maxW) size *= maxW / widest;
         float y = top + size;
-        // UV line
         float xx = seg(cv, "UV ", x, y, size, TITLE);
         if (c.uvMax < 0) seg(cv, "--", xx, y, size, FAINT);
         else { xx = seg(cv, c.uvMax + "/11 ", xx, y, size, VALUE); seg(cv, uvBand(c.uvMax), xx, y, size, uvColor(c.uvMax)); }
@@ -344,6 +359,8 @@ final class CgaRenderer {
     }
 
     // ---- text + line helpers ----
+
+    private float measure(String s, float size) { text.setTextSize(size); return text.measureText(s); }
 
     private float drawLeft(Canvas cv, String s, float x, float baseline, float size) {
         text.setTextSize(size);
