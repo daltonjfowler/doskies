@@ -49,8 +49,8 @@ final class CgaRenderer {
     /** Pure layout decision from the widget's current size in dp. */
     static Variant chooseVariant(int wDp, int hDp) {
         if (hDp < 60) return Variant.STRIP;
-        if (wDp >= 250 && hDp < 110) return Variant.WIDE;
-        if (hDp >= 200) return Variant.LARGE;
+        if (wDp >= 250 && hDp < 170) return Variant.WIDE;  // wide + not tall -> the 7-day row
+        if (hDp >= 170) return Variant.LARGE;              // tall -> the stacked list
         return Variant.MEDIUM;
     }
 
@@ -168,7 +168,7 @@ final class CgaRenderer {
 
     private void drawStrip(Canvas cv, Screen scr, float left, float right, int h) {
         Forecast f = scr.forecast;
-        float size = clamp(h * 0.42f, 11f, 22f);
+        float size = Math.max(13f, h * 0.5f);
         float gy = h * 0.12f, gsz = h * 0.72f;
         float x = left;
         if (f != null) {
@@ -209,15 +209,15 @@ final class CgaRenderer {
             text.setColor(ACCENT);
             drawLeft(cv, "Waiting", left, top + s * 2.6f, s);
         } else {
-            float gsz = clamp(availH * 0.42f, 22f * d, 46f * d);
+            float gsz = clamp(availH * 0.34f, 20f, availH * 0.5f);
             Glyphs.draw(cv, fill, f.current.code, left, top, gsz);
-            float tsz = clamp(availH * 0.34f, 18f, 40f);
+            float tsz = Math.max(22f, availH * 0.28f);
             text.setColor(VALUE);
-            drawLeft(cv, f.current.temp + degree(f), left + gsz + 5f * d, top + tsz, tsz);
-            float csz = clamp(13f * d, 11f, 18f);
+            drawLeft(cv, f.current.temp + degree(f), left + gsz + 5f * d, top + gsz * 0.82f, tsz);
+            float csz = Math.max(13f, availH * 0.14f);
             text.setColor(ACCENT);
             drawLeft(cv, (scr.demo ? "DEMO " : "") + Wmo.label(f.current.code), left, top + gsz + csz, csz);
-            drawStatsStacked(cv, f, left, top + gsz + csz + 3f * d, clamp(12f * d, 10f, 15f), nowRight - left);
+            drawStatsStacked(cv, f, left, top + gsz + csz + 2f * d, Math.max(12f, availH * 0.115f), nowRight - left);
         }
 
         // vertical dashed rule
@@ -229,7 +229,7 @@ final class CgaRenderer {
         // 7 day columns
         float colsLeft = nowRight + 8f * d;
         float colW = (right - colsLeft) / 7f;
-        float line = clamp(availH / 5.3f, 9f, 18f);
+        float line = Math.max(11f, availH / 4.8f);
         for (int i = 0; i < 7 && i < f.days.length; i++) {
             Forecast.Day day = f.days[i];
             float cx = colsLeft + colW * (i + 0.5f);
@@ -267,18 +267,19 @@ final class CgaRenderer {
             }
             return;
         }
-        // current row: glyph + temp, condition beneath
-        float gsz = clamp(34f * d, 26f, 52f);
+        // current row: glyph + temp, condition beneath. Sizes scale with the panel height H.
+        float H = bottom - top;
+        float gsz = Math.max(26f, H * 0.17f);
         Glyphs.draw(cv, fill, f.current.code, left, top, gsz);
-        float tsz = clamp(30f * d, 22f, 44f);
+        float tsz = Math.max(22f, H * 0.15f);
         text.setColor(VALUE);
         drawLeft(cv, f.current.temp + degree(f), left + gsz + 6f * d, top + tsz * 0.9f, tsz);
-        float csz = clamp(14f * d, 12f, 18f);
+        float csz = Math.max(13f, H * 0.07f);
         text.setColor(ACCENT);
         drawLeft(cv, Wmo.label(f.current.code), left + gsz + 6f * d, top + tsz * 0.9f + csz + 2f * d, csz);
         float y = top + gsz + 3f * d;
         // stats line
-        drawStatsRow(cv, f, left, y + csz, clamp(13f * d, 11f, 16f));
+        drawStatsRow(cv, f, left, y + csz, Math.max(12f, H * 0.06f));
         y += csz + 6f * d;
         // status line (freshness / error)
         if (!scr.status.isEmpty()) {
@@ -294,7 +295,7 @@ final class CgaRenderer {
         // day rows
         int n = Math.min(rows, f.days.length);
         float rowH = (bottom - y) / Math.max(1, n);
-        float rsz = clamp(Math.min(15f * d, rowH * 0.6f), 10f, 18f);
+        float rsz = Math.max(12f, rowH * 0.6f);
         float gcol = left + rsz * 3.2f;         // day-of-week column width
         float glyphSz = Math.min(rowH * 0.82f, rsz * 1.5f);
         for (int i = 0; i < n; i++) {

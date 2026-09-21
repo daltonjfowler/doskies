@@ -43,9 +43,10 @@ public class CgaRendererTest {
         assertEquals(CgaRenderer.Variant.MEDIUM, CgaRenderer.chooseVariant(249, 60));
     }
 
-    @Test public void atWideHeightThresholdFallsToMedium() {
-        // h == 110 fails "h < 110"; not tall enough for LARGE (h < 200) either -> MEDIUM.
-        assertEquals(CgaRenderer.Variant.MEDIUM, CgaRenderer.chooseVariant(250, 110));
+    @Test public void wideExtendsUpToTheNewHeightThreshold() {
+        // WIDE now covers wide widgets up to h < 170; at h == 170 it becomes LARGE.
+        assertEquals(CgaRenderer.Variant.WIDE, CgaRenderer.chooseVariant(250, 169));
+        assertEquals(CgaRenderer.Variant.LARGE, CgaRenderer.chooseVariant(250, 170));
     }
 
     // ---- chooseVariant: LARGE h>=200, takes priority over WIDE's width check ----
@@ -58,8 +59,10 @@ public class CgaRendererTest {
         assertEquals(CgaRenderer.Variant.LARGE, CgaRenderer.chooseVariant(300, 200));
     }
 
-    @Test public void height199FallsToMedium() {
-        assertEquals(CgaRenderer.Variant.MEDIUM, CgaRenderer.chooseVariant(100, 199));
+    @Test public void narrowJustUnderLargeHeightIsMedium() {
+        // Narrow (w < 250): below the 170 height it is MEDIUM, at/above it is LARGE.
+        assertEquals(CgaRenderer.Variant.MEDIUM, CgaRenderer.chooseVariant(100, 169));
+        assertEquals(CgaRenderer.Variant.LARGE, CgaRenderer.chooseVariant(100, 170));
     }
 
     // ---- chooseVariant: MEDIUM otherwise ----
