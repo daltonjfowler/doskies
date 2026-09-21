@@ -37,13 +37,21 @@ Forecast (units swap `fahrenheit`/`celsius` per the setting):
 ```
 GET https://api.open-meteo.com/v1/forecast
     ?latitude={lat}&longitude={lon}
-    &current=temperature_2m,weather_code,precipitation
-    &daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max
+    &current=temperature_2m,weather_code,precipitation,relative_humidity_2m,wind_speed_10m
+    &daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max
     &temperature_unit=fahrenheit&precipitation_unit=inch&wind_speed_unit=mph
     &timezone=auto&forecast_days=7
 ```
 `daily.*` are parallel arrays indexed by `daily.time[i]` (ISO date). Model:
-`Forecast { current{tempF, code, precip}, days[7]{ date, hi, lo, precipChancePct, code } }`.
+`Forecast { current{temp, code, precip, humidity, uvMax, wind}, days[7]{ date, hi, lo, precipChancePct, code } }`.
+`humidity` = current `relative_humidity_2m` (%); `uvMax` = today's `daily.uv_index_max[0]` rounded,
+shown as `N/11` + band (Low 0-2 / Moderate 3-5 / High 6-7 / Very High 8-10 / Extreme 11+); `wind` =
+current `wind_speed_10m`, and `wind_speed_unit` follows the temp unit (mph for F, km/h for C). All
+three shown in the current block only, not per day (Dalton's request 2026-09-20; needs a small T1
+data-layer patch before the T5 look can show live values).
+Tides: NOT available from Open-Meteo (would require NOAA Tides & Currents, US-only + coastal) — out
+of scope; Medford NJ is inland. Field customization (user picks which stats show): future enhancement,
+not built yet.
 
 City search (fixed-location mode only):
 ```
@@ -115,6 +123,18 @@ Each task ends green on `scripts/build.ps1` before the next begins.
 - Repo visibility: starting **private**. Say the word to make it public.
 - Units default **Fahrenheit** with a Celsius toggle. Change the default if you prefer.
 - Widget appearance knobs (accent/opacity) or a single fixed DOS palette: decided in the T5 art pass.
+
+### T5 look direction (Dalton, 2026-09-20)
+CHOSEN: **CGA panel window** — a DOS window (title bar + double border), authentic CGA-16 palette,
+pixel font (VT323, SIL OFL, to be bundled + credited), small colorful pixel weather glyphs. Chosen
+to sit with the home screen's neon pixel-DOS icons.
+LOCKED SETTINGS (Dalton, blessed mockup v3): ground = **Navy** (#101034 panel, not classic blue);
+**scanlines ON**; keep the **precip %** in each day column; add **UV** + **Humidity** to the current
+block. LAYOUTS: one adaptive widget that picks by shape — WIDE ROW (current left + all 7 days
+across, like his old widget) when wide/short, plus the stacked LARGE/MEDIUM/STRIP when taller.
+Mockup: https://claude.ai/artifact/RKQxKSdPSAgUxy6Y54QFYH
+TABLED (kept for possible later, not discarded): Amber CRT terminal (mono amber-on-black +
+scanlines); Pixel-art scene (larger Game Boy-ish glyphs, art over terminal).
 
 ## Handoff status
 
@@ -221,3 +241,23 @@ Each task ends green on `scripts/build.ps1` before the next begins.
   live-device validation (the permission prompt, a real city search, GrapheneOS's Geocoder
   absence, actually resizing and reading the widget) is still Dalton's on the Pixel 7. Next up is
   T5 (the look, done by hand).
+- 2026-09-20: T5a done (the small data-layer patch T5's look needs). `Repository.fetch` now also
+  requests `relative_humidity_2m` and `wind_speed_10m` under `current=`, and `uv_index_max` under
+  `daily=`; `wind_speed_unit` follows the temperature unit exactly like `precipitation_unit`
+  already did (mph for Fahrenheit, kmh for Celsius), via a new pure `Repository.buildUrl` extracted
+  for string-only testing. `Forecast.Current` gains `humidity` (%), `uvMax` (rounded from today's
+  `daily.uv_index_max[0]`), `wind` (rounded), and `windUnit` ("mph"/"km/h"); a new `Forecast.UNKNOWN`
+  sentinel (-1) and `Forecast.Current.display(int)` helper (renders UNKNOWN as "--") back the three
+  new fields. `Weather.parse` reads all three as optional/best-effort: absent or null (not merely
+  0, which is itself a valid reading) becomes UNKNOWN and never throws, while every existing
+  required field keeps throwing exactly as before. `Weather.demo()` carries realistic values
+  (humidity 78, uvMax 5, wind 8, windUnit "mph"). `ForecastWidget` was not touched (still reads
+  only `current.temp`/`current.code`) and still compiles and renders; showing the new fields is
+  T5's job. 7 new offline JUnit/Robolectric test runs (4 in `WeatherTest`: the three new fields
+  parsed and rounded correctly plus wind unit under Celsius, a fixture missing all three optional
+  fields parsing clean to UNKNOWN, a fixture with them explicitly `null` doing the same, and
+  demo()'s realistic values; 3 in `RepositoryTest`: `buildUrl` string assertions for
+  mph/inch/fahrenheit vs kmh/mm/celsius and that the new fields are requested) bring the suite to
+  96 offline test runs total, all green, no network in any test. `build.ps1` green: assembleRelease,
+  testDebugUnitTest, lintRelease. Next up is T5b: wire these fields into the actual CGA-panel
+  layouts (done by hand).

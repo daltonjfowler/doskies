@@ -35,6 +35,12 @@ public final class Weather {
         int curCode = current.getInt("weather_code");
         double curPrecip = current.getDouble("precipitation");
 
+        // Optional, best-effort fields: absent or null means UNKNOWN, never a thrown exception
+        // and never coerced to 0 (0 is itself a valid humidity/UV/wind reading).
+        int humidity = optRoundedInt(current, "relative_humidity_2m");
+        int wind = optRoundedInt(current, "wind_speed_10m");
+        String windUnit = unit == 'C' ? "km/h" : "mph";
+
         JSONArray time = daily.optJSONArray("time");
         JSONArray codes = daily.optJSONArray("weather_code");
         JSONArray his = daily.optJSONArray("temperature_2m_max");
@@ -46,6 +52,9 @@ public final class Weather {
         if (n != DAYS || codes.length() != n || his.length() != n || los.length() != n || pops.length() != n)
             throw new IllegalArgumentException("Forecast response daily arrays are incomplete.");
 
+        JSONArray uvMaxes = daily.optJSONArray("uv_index_max");
+        int uvMax = optRoundedInt(uvMaxes, 0);
+
         Forecast.Day[] days = new Forecast.Day[n];
         for (int i = 0; i < n; i++) {
             String date = time.getString(i);
@@ -55,7 +64,8 @@ public final class Weather {
             int code = codes.getInt(i);
             days[i] = new Forecast.Day(date, hi, lo, pop, code);
         }
-        return new Forecast(unit, new Forecast.Current(curTemp, curCode, curPrecip), days);
+        Forecast.Current cur = new Forecast.Current(curTemp, curCode, curPrecip, humidity, uvMax, wind, windUnit);
+        return new Forecast(unit, cur, days);
     }
 
     /**
@@ -73,11 +83,31 @@ public final class Weather {
             new Forecast.Day("2026-09-25", 72, 59, 90, 95),
             new Forecast.Day("2026-09-26", 40, 29, 40, 71),
         };
-        return new Forecast('F', new Forecast.Current(71, 1, 0.0), days);
+        return new Forecast('F', new Forecast.Current(71, 1, 0.0, 78, 5, 8, "mph"), days);
     }
 
     private static int round(double v) { return (int) Math.round(v); }
     private static int clampPct(int v) { return Math.max(0, Math.min(100, v)); }
+
+    /** Reads an optional numeric field from a JSONObject; UNKNOWN (-1) if absent, null, or not a number. */
+    private static int optRoundedInt(JSONObject obj, String key) {
+        if (obj == null || !obj.has(key) || obj.isNull(key)) return Forecast.UNKNOWN;
+        try {
+            return round(obj.getDouble(key));
+        } catch (Exception e) {
+            return Forecast.UNKNOWN;
+        }
+    }
+
+    /** Reads an optional numeric entry from a JSONArray (e.g. daily.uv_index_max[0]); UNKNOWN (-1) if absent or null. */
+    private static int optRoundedInt(JSONArray arr, int index) {
+        if (arr == null || index < 0 || index >= arr.length() || arr.isNull(index)) return Forecast.UNKNOWN;
+        try {
+            return round(arr.getDouble(index));
+        } catch (Exception e) {
+            return Forecast.UNKNOWN;
+        }
+    }
 
     private Weather() {}
 }

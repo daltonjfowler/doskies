@@ -20,15 +20,24 @@ final class Repository {
     static final ExecutorService IO = Executors.newSingleThreadExecutor();
     static final Object LOCK = new Object();
 
+    /**
+     * Builds the exact forecast URL from PLAN.md's data contract. wind_speed_unit follows the
+     * temperature unit exactly like precipitation_unit already does: mph/inch for Fahrenheit,
+     * kmh/mm for Celsius. Pure and network-free so it can be unit-tested as a plain string.
+     */
+    static String buildUrl(double lat, double lon, char unit) {
+        boolean celsius = unit == 'C';
+        return String.format(Locale.US,
+            "https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s"
+                + "&current=temperature_2m,weather_code,precipitation,relative_humidity_2m,wind_speed_10m"
+                + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max"
+                + "&temperature_unit=%s&precipitation_unit=%s&wind_speed_unit=%s&timezone=auto&forecast_days=7",
+            lat, lon, celsius ? "celsius" : "fahrenheit", celsius ? "mm" : "inch", celsius ? "kmh" : "mph");
+    }
+
     /** Builds the exact forecast URL from PLAN.md, fetches it, and validates the body parses. */
     static String fetch(double lat, double lon, char unit) throws Exception {
-        boolean celsius = unit == 'C';
-        String url = String.format(Locale.US,
-            "https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s"
-                + "&current=temperature_2m,weather_code,precipitation"
-                + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"
-                + "&temperature_unit=%s&precipitation_unit=%s&wind_speed_unit=mph&timezone=auto&forecast_days=7",
-            lat, lon, celsius ? "celsius" : "fahrenheit", celsius ? "mm" : "inch");
+        String url = buildUrl(lat, lon, unit);
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         try {
             c.setInstanceFollowRedirects(false);

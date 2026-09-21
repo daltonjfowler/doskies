@@ -44,4 +44,29 @@ public class RepositoryTest {
         Repository.refresh(c);
         assertEquals("", s.error());
     }
+
+    // ---- fetch URL construction: pure string assertions, no network ----
+
+    @Test public void fetchUrlUsesMphAndInchForFahrenheit() {
+        String url = Repository.buildUrl(42.42, -71.11, 'F');
+        assertTrue(url.contains("wind_speed_unit=mph"));
+        assertTrue(url.contains("precipitation_unit=inch"));
+        assertTrue(url.contains("temperature_unit=fahrenheit"));
+        assertFalse(url.contains("wind_speed_unit=kmh"));
+    }
+
+    @Test public void fetchUrlUsesKmhAndMmForCelsius() {
+        String url = Repository.buildUrl(42.42, -71.11, 'C');
+        assertTrue(url.contains("wind_speed_unit=kmh"));
+        assertTrue(url.contains("precipitation_unit=mm"));
+        assertTrue(url.contains("temperature_unit=celsius"));
+        assertFalse(url.contains("wind_speed_unit=mph"));
+    }
+
+    @Test public void fetchUrlRequestsTheNewOptionalFields() {
+        String url = Repository.buildUrl(42.42, -71.11, 'F');
+        assertTrue(url.contains("relative_humidity_2m"));
+        assertTrue(url.contains("wind_speed_10m"));
+        assertTrue(url.contains("uv_index_max"));
+    }
 }

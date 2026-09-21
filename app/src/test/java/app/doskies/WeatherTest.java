@@ -14,13 +14,15 @@ public class WeatherTest {
     // 7 days, temperature_unit=fahrenheit as PLAN.md's contract specifies for the 'F' fetch.
     private static final String FIXTURE = "{"
         + "\"latitude\":42.42,\"longitude\":-71.11,"
-        + "\"current\":{\"time\":\"2026-09-20T14:00\",\"temperature_2m\":71.4,\"weather_code\":2,\"precipitation\":0.0},"
+        + "\"current\":{\"time\":\"2026-09-20T14:00\",\"temperature_2m\":71.4,\"weather_code\":2,\"precipitation\":0.0,"
+        + "\"relative_humidity_2m\":64,\"wind_speed_10m\":11.6},"
         + "\"daily\":{"
         + "\"time\":[\"2026-09-20\",\"2026-09-21\",\"2026-09-22\",\"2026-09-23\",\"2026-09-24\",\"2026-09-25\",\"2026-09-26\"],"
         + "\"weather_code\":[2,3,61,63,0,95,71],"
         + "\"temperature_2m_max\":[75.2,70.1,66.8,64.3,78.9,72.0,40.4],"
         + "\"temperature_2m_min\":[58.6,55.4,52.1,50.9,60.2,59.5,28.7],"
-        + "\"precipitation_probability_max\":[10,20,70,85,0,90,40]"
+        + "\"precipitation_probability_max\":[10,20,70,85,0,90,40],"
+        + "\"uv_index_max\":[5.4,4.8,2.1,1.0,6.7,3.3,0.0]"
         + "}}";
 
     @Test public void parsesSevenDays() throws Exception {
@@ -34,6 +36,40 @@ public class WeatherTest {
         assertEquals(71, f.current.temp);   // 71.4 rounds down
         assertEquals(2, f.current.code);
         assertEquals(0.0, f.current.precip, 0.0001);
+        assertEquals(64, f.current.humidity);
+        assertEquals(12, f.current.wind); // 11.6 rounds up
+        assertEquals("mph", f.current.windUnit);
+        assertEquals(5, f.current.uvMax); // today's uv_index_max[0] 5.4 rounds down
+    }
+
+    @Test public void windUnitFollowsCelsius() throws Exception {
+        Forecast f = Weather.parse(FIXTURE, 'C');
+        assertEquals("km/h", f.current.windUnit);
+    }
+
+    @Test public void optionalCurrentFieldsAreUnknownWhenAbsentAndNeverThrow() throws Exception {
+        // No relative_humidity_2m, no wind_speed_10m, no uv_index_max at all: still a valid parse.
+        String noExtras = FIXTURE
+            .replace(",\"relative_humidity_2m\":64,\"wind_speed_10m\":11.6", "")
+            .replace(",\"uv_index_max\":[5.4,4.8,2.1,1.0,6.7,3.3,0.0]", "");
+        Forecast f = Weather.parse(noExtras, 'F');
+        assertEquals(Forecast.UNKNOWN, f.current.humidity);
+        assertEquals(Forecast.UNKNOWN, f.current.wind);
+        assertEquals(Forecast.UNKNOWN, f.current.uvMax);
+        // The required fields are untouched by the missing optionals.
+        assertEquals(71, f.current.temp);
+        assertEquals(7, f.days.length);
+        assertEquals("--", Forecast.Current.display(f.current.humidity));
+    }
+
+    @Test public void optionalCurrentFieldsAreUnknownWhenNullAndNeverThrow() throws Exception {
+        String nulled = FIXTURE
+            .replace("\"relative_humidity_2m\":64,\"wind_speed_10m\":11.6", "\"relative_humidity_2m\":null,\"wind_speed_10m\":null")
+            .replace("\"uv_index_max\":[5.4,4.8,2.1,1.0,6.7,3.3,0.0]", "\"uv_index_max\":[null,4.8,2.1,1.0,6.7,3.3,0.0]");
+        Forecast f = Weather.parse(nulled, 'F');
+        assertEquals(Forecast.UNKNOWN, f.current.humidity);
+        assertEquals(Forecast.UNKNOWN, f.current.wind);
+        assertEquals(Forecast.UNKNOWN, f.current.uvMax);
     }
 
     @Test public void parsesFirstDay() throws Exception {
@@ -83,6 +119,14 @@ public class WeatherTest {
         // The demo is a fixed, hand-authored snapshot; it must not equal a parsed live fixture,
         // so nothing downstream could confuse the two.
         assertNotEquals(demo.current.temp, 0);
+    }
+
+    @Test public void demoIncludesRealisticHumidityUvAndWind() {
+        Forecast.Current cur = Weather.demo().current;
+        assertEquals(78, cur.humidity);
+        assertEquals(5, cur.uvMax);
+        assertEquals(8, cur.wind);
+        assertEquals("mph", cur.windUnit);
     }
 
     // ---- malformed responses must throw, never silently coerce to zeros ----

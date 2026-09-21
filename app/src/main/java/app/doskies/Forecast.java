@@ -18,16 +18,32 @@ public final class Forecast {
         this.days = days;
     }
 
+    /** Sentinel for an optional current-conditions field that was absent or null in the response. */
+    public static final int UNKNOWN = -1;
+
     /** Current conditions. temp is a rounded int in the forecast's unit. */
     public static final class Current {
         public final int temp;
         public final int code;      // raw WMO weather code; see Wmo
         public final double precip; // current precipitation, in the fetch's precipitation_unit
+        public final int humidity;  // relative_humidity_2m, percent; UNKNOWN (-1) if absent
+        public final int uvMax;     // today's daily.uv_index_max[0], rounded; UNKNOWN (-1) if absent
+        public final int wind;      // wind_speed_10m, rounded, in windUnit; UNKNOWN (-1) if absent
+        public final String windUnit; // "mph" or "km/h"; matches the fetch's temperature unit
 
-        public Current(int temp, int code, double precip) {
+        public Current(int temp, int code, double precip, int humidity, int uvMax, int wind, String windUnit) {
             this.temp = temp;
             this.code = code;
             this.precip = precip;
+            this.humidity = humidity;
+            this.uvMax = uvMax;
+            this.wind = wind;
+            this.windUnit = windUnit;
+        }
+
+        /** Renders an optional field for display: "--" when UNKNOWN, else the value as a string. */
+        public static String display(int value) {
+            return value == UNKNOWN ? "--" : String.valueOf(value);
         }
     }
 
