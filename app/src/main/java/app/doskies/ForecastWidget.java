@@ -57,10 +57,22 @@ public final class ForecastWidget extends AppWidgetProvider {
 
     /** Renders one widget instance at its current size. */
     private static RemoteViews build(Context c, AppWidgetManager m, int id) {
-        DisplayMetrics dm = c.getResources().getDisplayMetrics();
         Bundle opts = m.getAppWidgetOptions(id);
         int wDp = optionDp(opts, AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250);
         int hDp = optionDp(opts, AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 110);
+        return buildForSize(c, wDp, hDp);
+    }
+
+    /**
+     * The actual assembled-widget build, extracted from {@link #build} as a plumbing-only seam so
+     * it can be driven directly by a test at representative sizes (docs/ADVERSARIAL-REVIEW.md's
+     * P2: widget integration coverage). Renders the CGA-panel bitmap at wDp x hDp, builds the real
+     * {@code forecast_widget_frame} RemoteViews, binds the bitmap ImageView, and wires both tap
+     * targets (open-app on the canvas, refresh on the overlay). No drawing lives here; that stays
+     * entirely in {@link CgaRenderer}.
+     */
+    static RemoteViews buildForSize(Context c, int wDp, int hDp) {
+        DisplayMetrics dm = c.getResources().getDisplayMetrics();
         CgaRenderer.Variant v = CgaRenderer.chooseVariant(wDp, hDp);
         int wPx = clampPx(Math.round(wDp * dm.density));
         int hPx = clampPx(Math.round(hDp * dm.density));
@@ -90,13 +102,20 @@ public final class ForecastWidget extends AppWidgetProvider {
      * (Store.demo(), an explicit user choice) always renders Weather.demo(), marked DEMO, and is
      * never substituted for a failed fetch. A present snapshot renders even when an error is set (a
      * failed refresh must not blank the last good forecast); the error then shows on the status line.
+     *
+     * <p>Snapshot provenance (docs/ADVERSARIAL-REVIEW.md's P1): a present snapshot is parsed with
+     * {@link Store#snapshotUnit()} and labeled with {@link Store#snapshotPlace()} -- the unit and
+     * place it was actually FETCHED under -- never the live, possibly-since-changed requested
+     * units()/placeLabel(). That keeps a unit change or a city change from relabeling or
+     * reconverting stale data after a failed refresh. The waiting and demo states have no fetched
+     * data to be faithful to, so they use the requested placeLabel() instead.
      */
     static CgaRenderer.Screen screen(Context c) {
         Store s = new Store(c);
         CgaRenderer.Screen scr = new CgaRenderer.Screen();
-        scr.place = s.placeLabel().toUpperCase(Locale.US);
 
         if (s.demo()) {
+            scr.place = s.placeLabel().toUpperCase(Locale.US);
             scr.forecast = Weather.demo();
             scr.demo = true;
             scr.status = "Demo data, not live";
@@ -106,14 +125,15 @@ public final class ForecastWidget extends AppWidgetProvider {
         String snapshot = s.snapshot();
         boolean hasError = !s.error().isEmpty();
         if (snapshot.isEmpty()) {
+            scr.place = s.placeLabel().toUpperCase(Locale.US);
             scr.forecast = null;
             scr.status = hasError ? s.error() : "Tap refresh to load";
             scr.statusIsError = hasError;
             return scr;
         }
+        scr.place = s.snapshotPlace().toUpperCase(Locale.US);
         try {
-            char unit = s.units().length() > 0 ? s.units().charAt(0) : 'F';
-            scr.forecast = Weather.parse(snapshot, unit);
+            scr.forecast = Weather.parse(snapshot, s.snapshotUnit());
         } catch (Exception e) {
             // A stored snapshot should always parse, but a corrupt value must never crash the widget.
             scr.forecast = null;

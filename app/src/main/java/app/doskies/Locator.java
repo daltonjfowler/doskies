@@ -3,28 +3,28 @@ package app.doskies;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.location.Address;
-import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Looper;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Coarse-only location, per PLAN.md/AGENTS.md: ACCESS_COARSE_LOCATION only, never blocks the
- * forecast on a denied permission or a missed fix, and never crashes when Geocoder is absent
- * (common on GrapheneOS). No Google Play services or FusedLocationProviderClient anywhere here.
+ * forecast on a denied permission or a missed fix. No Google Play services or
+ * FusedLocationProviderClient anywhere here, and no platform Geocoder either: reverse geocoding
+ * was removed because it can make an unspecified network call, which would break the strict
+ * Open-Meteo-only privacy promise (see docs/ADVERSARIAL-REVIEW.md). Auto-located forecasts are
+ * labeled "Current location" instead (decided at snapshot time; see Repository.snapshotLabel).
  *
- * <p>{@link #resolveCoordinates} and {@link #resolveLabel} are pure decision functions with no
- * Android dependency, so they are unit-tested directly without Robolectric. Everything else here
- * talks to the platform and is exercised through Repository's wiring and, for the permission
- * check, a small Robolectric smoke test.
+ * <p>{@link #resolveCoordinates} is a pure decision function with no Android dependency, so it is
+ * unit-tested directly without Robolectric. Everything else here talks to the platform and is
+ * exercised through Repository's wiring and, for the permission check, a small Robolectric smoke
+ * test.
  */
 final class Locator {
     /** An older cached fix than this is not trusted over the stored place. */
@@ -113,29 +113,6 @@ final class Locator {
         return ref.get();
     }
 
-    /**
-     * If Geocoder.isPresent() (it is often absent on GrapheneOS), reverse-geocodes a fix to a
-     * short "City" or "City, State" label; otherwise returns null so the caller keeps the stored
-     * label. Guarded end to end: any failure returns null rather than throwing.
-     */
-    static String reverseLabel(Context c, double lat, double lon) {
-        if (!Geocoder.isPresent()) return null;
-        try {
-            Geocoder geocoder = new Geocoder(c, Locale.US);
-            @SuppressWarnings("deprecation") // the synchronous overload; called off the main thread
-            List<Address> addresses = geocoder.getFromLocation(lat, lon, 1);
-            if (addresses == null || addresses.isEmpty()) return null;
-            Address a = addresses.get(0);
-            String city = a.getLocality();
-            if (city == null || city.isEmpty()) city = a.getSubAdminArea();
-            if (city == null || city.isEmpty()) return null;
-            String state = a.getAdminArea();
-            return (state != null && !state.isEmpty()) ? city + ", " + state : city;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
     /** A minimal, Android-free fix: just enough for the coordinate decision below to be pure. */
     static final class Fix {
         final double lat;
@@ -156,17 +133,6 @@ final class Locator {
             return new double[] { fix.lat, fix.lon };
         }
         return new double[] { storedLat, storedLon };
-    }
-
-    /**
-     * Pure decision: which place label to show. Mirrors resolveCoordinates's shape so the same
-     * fallback story (device signal wins only when it is actually usable) is unit-tested directly.
-     * geocoderPresent false, or a null/empty reverseLabel (device present but the lookup missed),
-     * both fall back to the stored label.
-     */
-    static String resolveLabel(boolean geocoderPresent, String reverseLabel, String storedLabel) {
-        if (geocoderPresent && reverseLabel != null && !reverseLabel.isEmpty()) return reverseLabel;
-        return storedLabel;
     }
 
     private Locator() {}

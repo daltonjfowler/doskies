@@ -19,7 +19,9 @@ Worker for this app without Dalton's go-ahead (see PLAN.md, Phase 2).
   failed fetch into fake "0%" or a blank forecast silently.
 - **Location is least-privilege.** Coarse location only, requested at runtime, and the app must
   work with location denied by falling back to a saved place (default Medford). Never block the
-  forecast on a permission the user declined.
+  forecast on a permission the user declined. No platform Geocoder: an auto-located forecast is
+  labeled "Current location", never a reverse-geocoded or invented city name, so the network-calls
+  promise below stays literally true.
 - **Visual work is done by hand in the main loop, never delegated to a build agent.** The pixel
   font choice, the weather glyphs, the palette, the widget composition and any Canvas rendering are
   authored by hand (the human-in-the-loop Opus session), not by a Sonnet build agent. A build agent

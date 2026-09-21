@@ -98,8 +98,9 @@ Each task ends green on `scripts/build.ps1` before the next begins.
   variant. **Gate:** `build.ps1` green; widget renders without crashing.
 
 - **T3 [Sonnet] Location.** Coarse `LocationManager` fix, runtime permission flow, auto mode with
-  saved-place fallback, fixed mode via city search, label handling (Geocoder if present, else stored
-  label). Unit tests for the mode/fallback decision logic. **Gate:** `build.ps1` green.
+  saved-place fallback, fixed mode via city search, label handling (auto -> "Current location", no
+  platform Geocoder; fixed -> the searched city's stored label). Unit tests for the mode/fallback
+  decision logic. **Gate:** `build.ps1` green.
 
 - **T4 [Sonnet] Settings app.** `MainActivity`: units toggle, location mode + city search, manual
   refresh, labeled demo toggle, about/credits, and a clearly marked seam for widget appearance the
@@ -261,3 +262,50 @@ scanlines); Pixel-art scene (larger Game Boy-ish glyphs, art over terminal).
   96 offline test runs total, all green, no network in any test. `build.ps1` green: assembleRelease,
   testDebugUnitTest, lintRelease. Next up is T5b: wire these fields into the actual CGA-panel
   layouts (done by hand).
+- 2026-09-21: T5d done (data-layer correctness fixes from `docs/ADVERSARIAL-REVIEW.md`'s adversarial
+  review, following T5b/T5c's hand-authored CGA-panel look and error markers). Plumbing/tests/docs
+  only; `CgaRenderer.java` and `Glyphs.java` were not touched. Two P1s fixed:
+  - **Snapshot provenance.** `Store.setSnapshot(String)` is now
+    `setSnapshot(String raw, char unit, String place, double lat, double lon)`, recording a
+    successful fetch as one coherent record (`snapshot_unit`, `snapshot_place`,
+    `snapshot_lat`/`lon` alongside the existing `snapshot`/`checked`, same clear-error behavior).
+    New `Store.snapshotUnit()`/`snapshotPlace()` read that record back (falling back to the
+    requested `units()`/`placeLabel()` only when no snapshot has ever been stored);
+    `units()`/`placeLabel()`/`lat()`/`lon()` still mean the live requested settings, unchanged.
+    `Repository.refresh` now calls `setSnapshot` with the unit/place/coordinates the fetch actually
+    used. `ForecastWidget.screen()` parses a present snapshot with `snapshotUnit()` and labels it
+    with `snapshotPlace()` (the waiting/demo states still use the requested `placeLabel()`, since
+    they have no fetched data to be faithful to). A unit change or a city change followed by a
+    failed refresh can no longer relabel or reconvert stale data.
+  - **Platform Geocoder removed.** `Locator.reverseLabel`/`resolveLabel` and the
+    `android.location.Geocoder` import are gone; `Repository.updateLocationIfAuto` only updates
+    Store's coordinates from a coarse fix now. The place label for a fetched snapshot is decided by
+    a new pure `Repository.snapshotLabel(mode, requestedPlaceLabel)`: `"Current location"` in auto
+    mode (never an invented or stale city name), the requested place label in fixed mode. The only
+    network calls this app makes are now, literally, Open-Meteo (plus, in Phase 2, Dalton's own
+    update host) -- no more conditional platform-Geocoder call.
+
+  Also restored the P2 assembled-widget integration coverage that fell during the T5 bitmap
+  conversion: `ForecastWidget.build` is now a thin wrapper around a new package-visible
+  `static RemoteViews buildForSize(Context, int wDp, int hDp)` (still no drawing logic; that stays
+  entirely in `CgaRenderer`), and a new `ForecastWidgetIntegrationTest` applies the real
+  `forecast_widget_frame` RemoteViews at one representative dp size per `CgaRenderer.Variant`
+  (STRIP/WIDE/MEDIUM/LARGE), checking the bitmap `ImageView` binds a real bitmap and that tapping
+  the canvas starts `MainActivity` and tapping refresh broadcasts `app.doskies.REFRESH`.
+
+  16 new offline JUnit/Robolectric test runs (4 new `StoreTest` cases for the snapshot-provenance
+  getters/defaults/replacement, doubled under `@Config(sdk={31,35})` to 8 runs; 3 new
+  `ForecastWidgetTest` regressions matching the review's exact scenarios -- a cached 71°F snapshot
+  stays 'F'/71 after switching to Celsius and failing a refresh, a cached "Alpha" snapshot stays
+  ALPHA after switching the requested place to "Beta" and failing a refresh, and an auto-mode
+  snapshot is labeled CURRENT LOCATION even with a stale "Medford" sitting in the requested
+  settings; 2 new `RepositoryTest` cases for `snapshotLabel`; 3 new `ForecastWidgetIntegrationTest`
+  cases), less 4 `LocatorTest` `resolveLabel` cases removed since that method no longer exists,
+  bring the suite (115 offline test runs before this pass, across every suite T4/T5b/T5c had
+  already grown it to) to 127 offline test runs total, all green, no network in any test. `build.ps1` green:
+  assembleRelease, testDebugUnitTest, lintRelease (`releases/DOSkies.apk` rebuilt). The review's
+  remaining P2 (a compact error indicator inside `drawStrip`/`drawWide` themselves) was already
+  covered by T5c's hand-authored error-marker pass; this T5d entry only backfills the handoff log
+  for T5b/T5c and adds the assembled-widget test coverage that P2 also called for. Live-device
+  validation (a real failed refresh, a real city change, GrapheneOS's Geocoder-less behavior,
+  resizing through every variant) is still Dalton's on the Pixel 7.

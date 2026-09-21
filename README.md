@@ -11,8 +11,10 @@ Built for GrapheneOS on a Pixel 7. No Google Play services required.
 
 ## Status
 
-Early scaffolding. See [PLAN.md](PLAN.md) for the build order and [AGENTS.md](AGENTS.md) for the
-house rules. Not yet installable.
+The DOS/pixel look (a CGA panel window, hand-rendered to a bitmap) has shipped, so the widget is
+installable and usable. On-device validation on the target Pixel 7/GrapheneOS hardware is still
+pending. See [PLAN.md](PLAN.md) for the build order and current handoff status, and
+[AGENTS.md](AGENTS.md) for the house rules.
 
 ## Building
 

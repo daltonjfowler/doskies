@@ -1,7 +1,6 @@
 package app.doskies;
 
 import android.content.Context;
-import android.location.Geocoder;
 import android.location.Location;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -68,11 +67,13 @@ final class Repository {
 
     /**
      * Reads lat/lon/unit from Store and fetches. In auto mode, first best-effort updates Store's
-     * coordinates (and label, if reverse geocoding works) from a coarse fix; a location miss of
-     * any kind never stops the fetch from using whatever coordinates end up in Store. In fixed
-     * mode the stored coordinates are used unchanged. On a successful fetch, stores the new
-     * snapshot, checked time, and clears any error. On failure, keeps the last snapshot untouched
-     * and records a clear error string; the forecast is never blanked.
+     * coordinates from a coarse fix (no reverse geocoding: see snapshotLabel below and
+     * docs/ADVERSARIAL-REVIEW.md); a location miss of any kind never stops the fetch from using
+     * whatever coordinates end up in Store. In fixed mode the stored coordinates are used
+     * unchanged. On a successful fetch, stores the new snapshot as one coherent record with the
+     * unit and place it was fetched under (never the live, possibly-since-changed settings) and
+     * clears any error. On failure, keeps the last snapshot untouched and records a clear error
+     * string; the forecast is never blanked.
      *
      * <p>Demo mode (an explicit, labeled user choice; see Store.demo()) short-circuits all of
      * this: no location lookup, no network call, nothing written to Store. ForecastWidget reads
@@ -89,7 +90,7 @@ final class Repository {
             try {
                 char unit = s.units().length() > 0 ? s.units().charAt(0) : 'F';
                 String raw = fetch(s.lat(), s.lon(), unit);
-                s.setSnapshot(raw);
+                s.setSnapshot(raw, unit, snapshotLabel(s.mode(), s.placeLabel()), s.lat(), s.lon());
                 return true;
             } catch (Exception e) {
                 String error = e instanceof IllegalArgumentException
@@ -101,10 +102,15 @@ final class Repository {
     }
 
     /**
-     * Best-effort, auto-mode-only coordinate (and label) update from a coarse fix, run before the
-     * fetch above. Every failure path here (no permission, no fix, a reverse-geocode miss, a
-     * stray exception) is swallowed so it can never stop the forecast from fetching with whatever
-     * coordinates Store already has.
+     * Best-effort, auto-mode-only coordinate update from a coarse fix, run before the fetch above.
+     * Every failure path here (no permission, no fix, a stray exception) is swallowed so it can
+     * never stop the forecast from fetching with whatever coordinates Store already has.
+     *
+     * <p>Deliberately does not touch any place label: reverse geocoding was removed (the platform
+     * Geocoder can make an unspecified network call, breaking the Open-Meteo-only privacy promise;
+     * see docs/ADVERSARIAL-REVIEW.md). The label for auto mode is decided at snapshot time instead
+     * (see {@link #snapshotLabel}), so it is always "Current location", never an invented or
+     * stale city name.
      */
     private static void updateLocationIfAuto(Context context, Store s) {
         if (!"auto".equals(s.mode())) return;
@@ -115,14 +121,20 @@ final class Repository {
             // The unit-tested decision function is the production path: no hand-rolled branching here.
             double[] coords = Locator.resolveCoordinates(s.mode(), hasPermission, f, s.lat(), s.lon());
             if (coords[0] != s.lat() || coords[1] != s.lon()) s.setLocation(coords[0], coords[1]);
-            if (f != null) {
-                String reverseLabel = Locator.reverseLabel(context, coords[0], coords[1]);
-                String label = Locator.resolveLabel(Geocoder.isPresent(), reverseLabel, s.placeLabel());
-                if (!label.equals(s.placeLabel())) s.setPlaceLabel(label);
-            }
         } catch (Exception e) {
             // A location failure of any kind must never stop the fetch below.
         }
+    }
+
+    /**
+     * Pure: the place label a successful fetch's snapshot should carry. Auto mode never invents a
+     * city name (no reverse geocoding, per the Open-Meteo-only privacy promise): it is simply
+     * "Current location". Fixed mode carries the requested place label the user chose via city
+     * search. Pulled out as its own function so this decision is unit-tested without a network
+     * call or an Android dependency.
+     */
+    static String snapshotLabel(String mode, String requestedPlaceLabel) {
+        return "auto".equals(mode) ? "Current location" : requestedPlaceLabel;
     }
 
     private Repository() {}

@@ -28,7 +28,7 @@ public class RepositoryTest {
     @Test public void demoModeSkipsFetchAndLeavesStoreUntouched() {
         Store s = new Store(c);
         s.setDemo(true);
-        s.setSnapshot("{\"marker\":\"unchanged\"}");
+        s.setSnapshot("{\"marker\":\"unchanged\"}", 'F', "Medford", 39.9007, -74.8235);
         long checkedBefore = s.checked();
 
         assertTrue("demo mode should report success without fetching", Repository.refresh(c));
@@ -68,5 +68,17 @@ public class RepositoryTest {
         assertTrue(url.contains("relative_humidity_2m"));
         assertTrue(url.contains("wind_speed_10m"));
         assertTrue(url.contains("uv_index_max"));
+    }
+
+    // ---- snapshotLabel: the pure decision behind auto mode's "Current location" label
+    // ---- (docs/ADVERSARIAL-REVIEW.md's second P1: no invented or stale city name) ----
+
+    @Test public void snapshotLabelInAutoModeIsAlwaysCurrentLocation() {
+        assertEquals("Current location", Repository.snapshotLabel("auto", "Medford"));
+        assertEquals("Current location", Repository.snapshotLabel("auto", ""));
+    }
+
+    @Test public void snapshotLabelInFixedModeIsTheRequestedPlaceLabel() {
+        assertEquals("Boston", Repository.snapshotLabel("fixed", "Boston"));
     }
 }

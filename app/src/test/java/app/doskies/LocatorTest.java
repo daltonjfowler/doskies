@@ -4,9 +4,11 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 /**
- * resolveCoordinates and resolveLabel have no Android dependency, so this is plain, fast,
- * offline JUnit: no Robolectric runner needed. Locator.hasLocationPermission (the one bit that
- * does need a real Context) gets its own smoke test in LocatorPermissionTest.
+ * resolveCoordinates has no Android dependency, so this is plain, fast, offline JUnit: no
+ * Robolectric runner needed. Locator.hasLocationPermission (the one bit that does need a real
+ * Context) gets its own smoke test in LocatorPermissionTest. Locator no longer resolves a place
+ * label at all (the platform Geocoder was removed; see docs/ADVERSARIAL-REVIEW.md and
+ * Repository.snapshotLabel, covered in RepositoryTest).
  */
 public class LocatorTest {
     private static final Locator.Fix FIX = new Locator.Fix(37.7749, -122.4194); // San Francisco
@@ -38,25 +40,5 @@ public class LocatorTest {
     @Test public void fixedModeWithoutPermissionAndNoFixStillUsesStored() {
         double[] coords = Locator.resolveCoordinates("fixed", false, null, STORED_LAT, STORED_LON);
         assertArrayEquals(new double[] { STORED_LAT, STORED_LON }, coords, 0.0);
-    }
-
-    // ---- resolveLabel: geocoder present vs absent, and a present-but-missed lookup ----
-
-    @Test public void presentWithAGoodLabelUsesIt() {
-        assertEquals("San Francisco, California", Locator.resolveLabel(true, "San Francisco, California", "Medford"));
-    }
-
-    @Test public void absentFallsBackToStoredEvenWithALabelInHand() {
-        // Should never happen in practice (reverseLabel returns null when absent), but the pure
-        // decision must not trust a label when the caller says the geocoder is not present.
-        assertEquals("Medford", Locator.resolveLabel(false, "San Francisco", "Medford"));
-    }
-
-    @Test public void presentButNullLookupFallsBackToStored() {
-        assertEquals("Medford", Locator.resolveLabel(true, null, "Medford"));
-    }
-
-    @Test public void presentButEmptyLookupFallsBackToStored() {
-        assertEquals("Medford", Locator.resolveLabel(true, "", "Medford"));
     }
 }

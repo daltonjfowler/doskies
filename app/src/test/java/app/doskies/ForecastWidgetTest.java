@@ -93,7 +93,7 @@ public class ForecastWidgetTest {
     @Test public void demoIgnoresAnyRealSnapshotOrError() {
         Store s = new Store(c);
         s.setDemo(true);
-        s.setSnapshot(DEMO_SNAPSHOT);
+        s.setSnapshot(DEMO_SNAPSHOT, 'F', "Medford", 39.9007, -74.8235);
         s.setError("Could not refresh. Check your connection.");
         CgaRenderer.Screen scr = ForecastWidget.screen(c);
         assertTrue(scr.demo);
@@ -128,7 +128,7 @@ public class ForecastWidgetTest {
 
     @Test public void errorWithSnapshotKeepsTheForecastAndFlagsTheStatusAsError() {
         Store s = new Store(c);
-        s.setSnapshot(DEMO_SNAPSHOT);
+        s.setSnapshot(DEMO_SNAPSHOT, 'F', "Medford", 39.9007, -74.8235);
         s.setError("Could not refresh. Check your connection.");
         CgaRenderer.Screen scr = ForecastWidget.screen(c);
         assertNotNull("a failed refresh must not blank the last good forecast", scr.forecast);
@@ -142,7 +142,7 @@ public class ForecastWidgetTest {
 
     @Test public void normalSnapshotParsesForecastAndShowsUpdatedStatus() {
         Store s = new Store(c);
-        s.setSnapshot(DEMO_SNAPSHOT);
+        s.setSnapshot(DEMO_SNAPSHOT, 'F', "Medford", 39.9007, -74.8235);
         assertTrue(s.error().isEmpty());
         CgaRenderer.Screen scr = ForecastWidget.screen(c);
         assertForecastIsParsedDemoFixture(scr.forecast);
@@ -158,11 +158,59 @@ public class ForecastWidgetTest {
         assertEquals("BOSTON", scr.place);
     }
 
+    // ---- snapshot provenance (docs/ADVERSARIAL-REVIEW.md's first P1): a cached forecast renders
+    // ---- with the unit/place it was FETCHED under, never the live requested settings, especially
+    // ---- across a failed refresh. ----
+
+    /** Regression A: a unit change followed by a failed refresh must never reconvert or relabel
+     * the cached forecast's unit -- 71 stays 'F', never presented as 71 'C'. */
+    @Test public void unitChangeAfterAFailedRefreshNeverRelabelsTheCachedForecastsUnit() {
+        Store s = new Store(c);
+        s.setSnapshot(DEMO_SNAPSHOT, 'F', "Medford", 39.9007, -74.8235); // fetched as F, temp 71
+        s.setUnits("C");                                                 // requested settings change
+        s.setError("Could not refresh. Check your connection.");        // ...and the refresh fails
+
+        CgaRenderer.Screen scr = ForecastWidget.screen(c);
+
+        assertNotNull(scr.forecast);
+        assertEquals("must render the snapshot's own fetched unit, not the live request", 'F', scr.forecast.unit);
+        assertEquals(71, scr.forecast.current.temp); // never reconverted to a bogus "71 C"
+        assertTrue(scr.statusIsError);
+    }
+
+    /** Regression B: selecting a different city followed by a failed refresh must never show the
+     * previous city's forecast under the new city's name. */
+    @Test public void cityChangeAfterAFailedRefreshNeverRelabelsTheCachedForecastsPlace() {
+        Store s = new Store(c);
+        s.setSnapshot(DEMO_SNAPSHOT, 'F', "Alpha", 39.9007, -74.8235); // fetched while place was Alpha
+        s.setPlaceLabel("Beta");                                       // user picks a new city
+        s.setError("Could not refresh. Check your connection.");      // ...and the refresh fails
+
+        CgaRenderer.Screen scr = ForecastWidget.screen(c);
+
+        assertEquals("must show the snapshot's own fetched place, not the newly requested one",
+            "ALPHA", scr.place);
+    }
+
+    /** Regression C: an auto-mode fetch's snapshot is always labeled "Current location", even
+     * when a stale fixed-mode label ("Medford") is still sitting in the requested settings. */
+    @Test public void autoModeSnapshotIsLabeledCurrentLocationNeverAStaleFixedCityName() {
+        Store s = new Store(c);
+        s.setMode("auto");
+        s.setPlaceLabel("Medford"); // stale, left over from a previous fixed-mode selection
+        String label = Repository.snapshotLabel(s.mode(), s.placeLabel()); // Repository.refresh's own logic
+        s.setSnapshot(DEMO_SNAPSHOT, 'F', label, 40.0, -75.0);
+
+        CgaRenderer.Screen scr = ForecastWidget.screen(c);
+
+        assertEquals("CURRENT LOCATION", scr.place);
+    }
+
     // ---- a corrupt stored snapshot must never crash the widget ----
 
     @Test public void corruptSnapshotYieldsNullForecastInsteadOfCrashing() {
         Store s = new Store(c);
-        s.setSnapshot("not json");
+        s.setSnapshot("not json", 'F', "Medford", 39.9007, -74.8235);
         CgaRenderer.Screen scr = ForecastWidget.screen(c);
         assertNull(scr.forecast);
         assertFalse(scr.statusIsError);

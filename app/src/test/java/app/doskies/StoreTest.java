@@ -59,7 +59,7 @@ public class StoreTest {
         s.setError("Offline");
         assertEquals("Offline", s.error());
 
-        s.setSnapshot("{\"ok\":true}");
+        s.setSnapshot("{\"ok\":true}", 'F', "Medford", 39.9007, -74.8235);
         assertEquals("{\"ok\":true}", s.snapshot());
         assertTrue(s.checked() > 0);
         assertEquals("", s.error());
@@ -67,7 +67,7 @@ public class StoreTest {
 
     @Test public void failedRefreshKeepsLastSnapshot() {
         Store s = new Store(c);
-        s.setSnapshot("{\"ok\":true}");
+        s.setSnapshot("{\"ok\":true}", 'F', "Medford", 39.9007, -74.8235);
         long checkedAt = s.checked();
 
         s.setError("Could not refresh. Check your connection.");
@@ -79,12 +79,55 @@ public class StoreTest {
 
     @Test public void clearRemovesErrorButKeepsSnapshot() {
         Store s = new Store(c);
-        s.setSnapshot("{\"ok\":true}");
+        s.setSnapshot("{\"ok\":true}", 'F', "Medford", 39.9007, -74.8235);
         s.setError("Offline");
 
         s.clear();
 
         assertEquals("", s.error());
         assertEquals("{\"ok\":true}", s.snapshot());
+    }
+
+    // ---- snapshot provenance (docs/ADVERSARIAL-REVIEW.md P1): the fetched unit/place, not the
+    // ---- live requested settings, is what a cached forecast must render with. ----
+
+    @Test public void snapshotUnitDefaultsToRequestedUnitsWhenNoSnapshotYet() {
+        Store s = new Store(c);
+        assertEquals('F', s.snapshotUnit()); // units() defaults to "F"
+        s.setUnits("C");
+        assertEquals('C', s.snapshotUnit());
+    }
+
+    @Test public void snapshotPlaceDefaultsToRequestedPlaceLabelWhenNoSnapshotYet() {
+        Store s = new Store(c);
+        assertEquals("Medford", s.snapshotPlace());
+        s.setPlaceLabel("Boston");
+        assertEquals("Boston", s.snapshotPlace());
+    }
+
+    @Test public void snapshotUnitAndPlaceAreTheFetchedOnesNotTheLiveRequestedSettings() {
+        Store s = new Store(c);
+        s.setSnapshot("{\"ok\":true}", 'F', "Alpha", 39.9007, -74.8235);
+
+        // The requested settings change after the fact...
+        s.setUnits("C");
+        s.setPlaceLabel("Beta");
+
+        // ...but the snapshot's own recorded unit/place must not move.
+        assertEquals('F', s.snapshotUnit());
+        assertEquals("Alpha", s.snapshotPlace());
+        // The requested settings themselves are unaffected and read back as set.
+        assertEquals("C", s.units());
+        assertEquals("Beta", s.placeLabel());
+    }
+
+    @Test public void newSnapshotReplacesThePreviousProvenance() {
+        Store s = new Store(c);
+        s.setSnapshot("{\"first\":true}", 'F', "Alpha", 39.9007, -74.8235);
+        s.setSnapshot("{\"second\":true}", 'C', "Beta", 42.36, -71.06);
+
+        assertEquals("{\"second\":true}", s.snapshot());
+        assertEquals('C', s.snapshotUnit());
+        assertEquals("Beta", s.snapshotPlace());
     }
 }

@@ -31,9 +31,38 @@ final class Store {
     void setPlaceLabel(String label) { prefs.edit().putString("place_label", label).apply(); }
 
     String snapshot() { return prefs.getString("snapshot", ""); }
-    /** Records a successful fetch: new snapshot, checked time, and the error (if any) is cleared. */
-    void setSnapshot(String raw) {
-        prefs.edit().putString("snapshot", raw).putLong("checked", System.currentTimeMillis()).remove("error").apply();
+
+    /**
+     * Records a successful fetch as one coherent record: the raw response plus the unit and place
+     * it was FETCHED in (not whatever units()/placeLabel() request next). Fixes the adversarial
+     * review's P1: a cached forecast must render with the settings it was fetched under, so a unit
+     * change or a city change followed by a failed refresh can never relabel or reconvert stale
+     * data. Also records checked time and clears the error (if any), same as before.
+     */
+    void setSnapshot(String raw, char unit, String place, double lat, double lon) {
+        prefs.edit()
+            .putString("snapshot", raw)
+            .putString("snapshot_unit", String.valueOf(unit))
+            .putString("snapshot_place", place)
+            .putFloat("snapshot_lat", (float) lat)
+            .putFloat("snapshot_lon", (float) lon)
+            .putLong("checked", System.currentTimeMillis())
+            .remove("error")
+            .apply();
+    }
+
+    /** The unit the current snapshot was fetched in (NOT the requested units()). */
+    char snapshotUnit() {
+        String stored = prefs.getString("snapshot_unit", null);
+        if (stored != null && !stored.isEmpty()) return stored.charAt(0);
+        String u = units();
+        return u.isEmpty() ? 'F' : u.charAt(0);
+    }
+
+    /** The place label the current snapshot was fetched under (NOT the requested placeLabel()). */
+    String snapshotPlace() {
+        String stored = prefs.getString("snapshot_place", null);
+        return stored != null ? stored : placeLabel();
     }
 
     long checked() { return prefs.getLong("checked", 0); }
