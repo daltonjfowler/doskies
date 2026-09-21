@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  T5 CGA-panel widget: a single ImageView carries the whole hand-rendered bitmap (CgaRenderer), so
+  the pixel font, glyphs, double border and scanlines stay faithful. A transparent View pinned
+  top-right is the refresh tap target that lines up with the drawn refresh glyph in the title bar.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/card"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/canvas"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:adjustViewBounds="false"
+        android:contentDescription="@string/widget_forecast_desc" />
+
+    <ImageView
+        android:id="@+id/refresh"
+        android:layout_width="48dp"
+        android:layout_height="44dp"
+        android:layout_gravity="top|end"
+        android:contentDescription="@string/widget_refresh_desc" />
+</FrameLayout>

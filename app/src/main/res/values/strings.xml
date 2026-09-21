@@ -2,4 +2,6 @@
 <resources>
     <string name="app_name">DOSkies</string>
     <string name="widget_description">Seven day forecast: high, low, and chance of rain.</string>
+    <string name="widget_forecast_desc">DOSkies weather forecast</string>
+    <string name="widget_refresh_desc">Refresh forecast</string>
 </resources>

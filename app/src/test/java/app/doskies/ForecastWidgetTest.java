@@ -1,9 +1,6 @@
 package app.doskies;
 
 import android.content.Context;
-import android.view.View;
-import android.widget.FrameLayout;
-import android.widget.TextView;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -13,16 +10,20 @@ import org.robolectric.annotation.Config;
 import static org.junit.Assert.*;
 
 /**
- * Renders ForecastWidget offline, for every size variant and for the three data states (waiting,
- * error-with-snapshot kept, and normal). No network call is ever made: every snapshot here is
- * either empty or a labeled fixture serialized to the Open-Meteo response shape (mirroring
- * Weather.demo()'s values) so it round-trips through Weather.parse exactly like a live fetch would.
+ * Exercises {@link ForecastWidget#screen(Context)} -- the pure state-building step that feeds
+ * {@link CgaRenderer} -- offline. No network call is ever made: every snapshot here is either
+ * empty, corrupt, or a labeled fixture serialized to the Open-Meteo response shape (mirroring
+ * Weather.demo()'s core values) so it round-trips through Weather.parse exactly like a live fetch
+ * would. CgaRenderer's own Canvas drawing is covered separately by CgaRendererTest; this file only
+ * checks the Screen state that drawing is built from.
  */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 35)
 public class ForecastWidgetTest {
 
-    // DEMO fixture: mirrors Weather.demo()'s current + 7 days, serialized to the real contract shape.
+    // Mirrors Weather.demo()'s current + 7 days, serialized to the real contract shape. Deliberately
+    // omits the optional current fields (humidity/uv/wind) that a real Open-Meteo response might
+    // also omit, so parsing it exercises the same UNKNOWN(-1) fallback Weather.parse guarantees.
     private static final String DEMO_SNAPSHOT = "{"
         + "\"current\":{\"temperature_2m\":71,\"weather_code\":1,\"precipitation\":0.0},"
         + "\"daily\":{"
@@ -40,148 +41,147 @@ public class ForecastWidgetTest {
         new Store(c).prefs.edit().clear().commit();
     }
 
-    private static View measure(Context c, ForecastWidget.Variant v, int widthDp, int heightDp) {
-        View widget = ForecastWidget.variant(c, v).apply(c, new FrameLayout(c));
-        float density = c.getResources().getDisplayMetrics().density;
-        int width = Math.round(widthDp * density), height = Math.round(heightDp * density);
-        widget.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
-            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY));
-        widget.layout(0, 0, width, height);
-        return widget;
+    /** Full field-by-field match against Weather.demo() itself (used when scr.forecast IS that call's result). */
+    private static void assertForecastIsWeatherDemo(Forecast f) {
+        Forecast demo = Weather.demo();
+        assertNotNull(f);
+        assertEquals(demo.unit, f.unit);
+        assertEquals(demo.current.temp, f.current.temp);
+        assertEquals(demo.current.code, f.current.code);
+        assertEquals(demo.current.humidity, f.current.humidity);
+        assertEquals(demo.current.uvMax, f.current.uvMax);
+        assertEquals(demo.current.wind, f.current.wind);
+        assertDaysMatchDemo(f);
     }
 
-    private static String text(View widget, int id) { return ((TextView) widget.findViewById(id)).getText().toString(); }
-
-    // ---- per-variant smoke test: renders the demo forecast without crashing, key fields populated ----
-
-    @Test public void stripRendersDemoWithoutCrashing() {
-        new Store(c).setSnapshot(DEMO_SNAPSHOT);
-        View widget = measure(c, ForecastWidget.Variant.STRIP, 110, 40);
-        assertFalse("current_temp should not be empty", text(widget, R.id.current_temp).trim().isEmpty());
-        assertNotEquals("--", text(widget, R.id.current_temp));
+    /** Core-field match for a forecast parsed from DEMO_SNAPSHOT, whose optional stats are absent. */
+    private static void assertForecastIsParsedDemoFixture(Forecast f) {
+        assertNotNull(f);
+        assertEquals('F', f.unit);
+        assertEquals(71, f.current.temp);
+        assertEquals(1, f.current.code);
+        assertEquals("optional field absent from the fixture stays UNKNOWN, never coerced",
+            Forecast.UNKNOWN, f.current.humidity);
+        assertEquals(Forecast.UNKNOWN, f.current.uvMax);
+        assertEquals(Forecast.UNKNOWN, f.current.wind);
+        assertDaysMatchDemo(f);
     }
 
-    @Test public void mediumRendersDemoWithoutCrashing() {
-        new Store(c).setSnapshot(DEMO_SNAPSHOT);
-        View widget = measure(c, ForecastWidget.Variant.MEDIUM, 180, 110);
-        assertFalse(text(widget, R.id.current_temp).trim().isEmpty());
-        assertFalse(text(widget, R.id.current_cond).trim().isEmpty());
-    }
-
-    @Test public void largeRendersDemoWithDayRowsPresent() {
-        new Store(c).setSnapshot(DEMO_SNAPSHOT);
-        View widget = measure(c, ForecastWidget.Variant.LARGE, 180, 250);
-        assertFalse(text(widget, R.id.current_temp).trim().isEmpty());
-
-        int[] rows = {R.id.day_0, R.id.day_1, R.id.day_2, R.id.day_3, R.id.day_4, R.id.day_5, R.id.day_6};
-        int[] dows = {R.id.day_0_dow, R.id.day_1_dow, R.id.day_2_dow, R.id.day_3_dow, R.id.day_4_dow, R.id.day_5_dow, R.id.day_6_dow};
-        int[] his  = {R.id.day_0_hi, R.id.day_1_hi, R.id.day_2_hi, R.id.day_3_hi, R.id.day_4_hi, R.id.day_5_hi, R.id.day_6_hi};
-        int[] los  = {R.id.day_0_lo, R.id.day_1_lo, R.id.day_2_lo, R.id.day_3_lo, R.id.day_4_lo, R.id.day_5_lo, R.id.day_6_lo};
-        int[] pops = {R.id.day_0_precip, R.id.day_1_precip, R.id.day_2_precip, R.id.day_3_precip, R.id.day_4_precip,
-            R.id.day_5_precip, R.id.day_6_precip};
-        for (int i = 0; i < 7; i++) {
-            assertEquals("day_" + i + " row should be visible", View.VISIBLE, widget.findViewById(rows[i]).getVisibility());
-            assertFalse("day_" + i + " dow should not be empty", text(widget, dows[i]).trim().isEmpty());
-            assertFalse("day_" + i + " hi should not be empty", text(widget, his[i]).trim().isEmpty());
-            assertFalse("day_" + i + " lo should not be empty", text(widget, los[i]).trim().isEmpty());
-            assertFalse("day_" + i + " precip should not be empty", text(widget, pops[i]).trim().isEmpty());
-        }
-        assertEquals("Today", text(widget, R.id.day_0_dow));
-    }
-
-    // ---- the three states ----
-
-    @Test public void noSnapshotShowsWaiting() {
-        // Store starts empty (before() clears it): no snapshot at all.
-        View widget = measure(c, ForecastWidget.Variant.LARGE, 180, 250);
-        assertEquals("--", text(widget, R.id.current_temp));
-        assertEquals("Waiting", text(widget, R.id.current_cond));
-        for (int id : new int[]{R.id.day_0, R.id.day_3, R.id.day_6}) {
-            assertEquals(View.GONE, widget.findViewById(id).getVisibility());
+    private static void assertDaysMatchDemo(Forecast f) {
+        Forecast.Day[] days = Weather.demo().days;
+        assertEquals(days.length, f.days.length);
+        for (int i = 0; i < days.length; i++) {
+            assertEquals(days[i].date, f.days[i].date);
+            assertEquals(days[i].hi, f.days[i].hi);
+            assertEquals(days[i].lo, f.days[i].lo);
+            assertEquals(days[i].precipChancePct, f.days[i].precipChancePct);
+            assertEquals(days[i].code, f.days[i].code);
         }
     }
 
-    @Test public void errorWithSnapshotStillShowsData() {
-        Store s = new Store(c);
-        s.setSnapshot(DEMO_SNAPSHOT);
-        s.setError("Could not refresh. Check your connection.");
-        View widget = measure(c, ForecastWidget.Variant.LARGE, 180, 250);
-        // The forecast is never blanked by an error: the last snapshot still renders.
-        assertNotEquals("--", text(widget, R.id.current_temp));
-        assertNotEquals("Waiting", text(widget, R.id.current_cond));
-        assertEquals(View.VISIBLE, widget.findViewById(R.id.day_0).getVisibility());
-        // The error is surfaced on the freshness line, not silently swallowed.
-        assertEquals("Could not refresh. Check your connection.", text(widget, R.id.freshness));
-    }
+    // ---- demo mode: always Weather.demo(), marked, never a substitute for a failure ----
 
-    @Test public void normalStateShowsForecastAndFreshness() {
-        Store s = new Store(c);
-        s.setSnapshot(DEMO_SNAPSHOT);
-        assertTrue(s.error().isEmpty());
-        View widget = measure(c, ForecastWidget.Variant.LARGE, 180, 250);
-        assertEquals("71°F", text(widget, R.id.current_temp));
-        assertEquals("Partly cloudy", text(widget, R.id.current_cond));
-        assertFalse(text(widget, R.id.freshness).trim().isEmpty());
-        assertNotEquals("Could not refresh. Check your connection.", text(widget, R.id.freshness));
-    }
-
-    @Test public void tapTargetsAreWired() {
-        new Store(c).setSnapshot(DEMO_SNAPSHOT);
-        View widget = measure(c, ForecastWidget.Variant.LARGE, 180, 250);
-        assertTrue(widget.findViewById(R.id.card).isClickable());
-        assertTrue(widget.findViewById(R.id.refresh).isClickable());
-    }
-
-    // ---- demo mode (Store.demo(), an explicit user choice from MainActivity's T4 toggle) ----
-
-    @Test public void demoModeShowsWeatherDemoWithAVisibleMarkerEvenWithNoSnapshot() {
-        // No snapshot at all: without demo mode this would be the Waiting state (see
-        // noSnapshotShowsWaiting above). With demo on, it must show Weather.demo() instead.
+    @Test public void demoOnRendersWeatherDemoAndSetsTheDemoFlag() {
         new Store(c).setDemo(true);
-        View widget = measure(c, ForecastWidget.Variant.LARGE, 180, 250);
-        assertEquals("71°F", text(widget, R.id.current_temp)); // Weather.demo()'s current temp
-        assertTrue("title should carry a DEMO marker", text(widget, R.id.title).contains("DEMO"));
-        assertEquals("Demo data, not live", text(widget, R.id.freshness));
-        assertEquals(View.VISIBLE, widget.findViewById(R.id.day_0).getVisibility());
+        CgaRenderer.Screen scr = ForecastWidget.screen(c);
+        assertTrue(scr.demo);
+        assertForecastIsWeatherDemo(scr.forecast);
+        assertEquals("Demo data, not live", scr.status);
+        assertFalse(scr.statusIsError);
     }
 
-    @Test public void demoModeOnStripMarksTheConditionLineSinceThereIsNoTitleThere() {
-        new Store(c).setDemo(true);
-        View widget = measure(c, ForecastWidget.Variant.STRIP, 110, 40);
-        assertTrue(text(widget, R.id.current_cond).startsWith("DEMO"));
-    }
-
-    @Test public void demoModeIgnoresAnyRealSnapshotOrError() {
+    @Test public void demoIgnoresAnyRealSnapshotOrError() {
         Store s = new Store(c);
         s.setDemo(true);
         s.setSnapshot(DEMO_SNAPSHOT);
         s.setError("Could not refresh. Check your connection.");
-        View widget = measure(c, ForecastWidget.Variant.LARGE, 180, 250);
-        // Demo mode always wins over whatever is in Store: no error text leaks through.
-        assertEquals("Demo data, not live", text(widget, R.id.freshness));
+        CgaRenderer.Screen scr = ForecastWidget.screen(c);
+        assertTrue(scr.demo);
+        assertForecastIsWeatherDemo(scr.forecast);
+        assertEquals("Demo data, not live", scr.status);
+        assertFalse("demo mode must not surface the stored error", scr.statusIsError);
     }
 
-    @Test public void demoOffAndNoSnapshotNeverShowsDemoDataEvenWithAnError() {
-        // The core AGENTS.md rule: a failed fetch must never be papered over with demo data.
+    // ---- no snapshot: waiting state ----
+
+    @Test public void noSnapshotYieldsNullForecastAndAStatus() {
+        // Store starts empty (before() clears it): no snapshot, no error, demo off.
+        CgaRenderer.Screen scr = ForecastWidget.screen(c);
+        assertNull(scr.forecast);
+        assertFalse(scr.demo);
+        assertEquals("Tap refresh to load", scr.status);
+        assertFalse(scr.statusIsError);
+    }
+
+    @Test public void noSnapshotWithAnErrorShowsTheErrorNeverWeatherDemo() {
+        // AGENTS.md's core rule: a failed fetch must never be papered over with demo data.
         Store s = new Store(c);
         s.setError("Could not refresh. Check your connection.");
-        assertFalse(s.demo());
-        View widget = measure(c, ForecastWidget.Variant.LARGE, 180, 250);
-        assertEquals("--", text(widget, R.id.current_temp)); // Waiting, not Weather.demo()'s 71
-        assertEquals("Waiting", text(widget, R.id.current_cond));
-        assertEquals(View.GONE, widget.findViewById(R.id.day_0).getVisibility());
+        CgaRenderer.Screen scr = ForecastWidget.screen(c);
+        assertNull(scr.forecast);
+        assertFalse(scr.demo);
+        assertEquals("Could not refresh. Check your connection.", scr.status);
+        assertTrue(scr.statusIsError);
     }
 
-    @Test public void demoOffKeepsLastSnapshotAndErrorInsteadOfDemoData() {
+    // ---- a present snapshot with an error set: the forecast is never blanked ----
+
+    @Test public void errorWithSnapshotKeepsTheForecastAndFlagsTheStatusAsError() {
         Store s = new Store(c);
         s.setSnapshot(DEMO_SNAPSHOT);
         s.setError("Could not refresh. Check your connection.");
-        assertFalse(s.demo());
-        View widget = measure(c, ForecastWidget.Variant.LARGE, 180, 250);
-        // Renders the real last snapshot (Repository never blanks it on failure), with the error
-        // on the freshness line, not the demo marker or demo's own freshness text.
-        assertFalse("title must not carry a DEMO marker when demo mode is off",
-            text(widget, R.id.title).contains("DEMO"));
-        assertEquals("Could not refresh. Check your connection.", text(widget, R.id.freshness));
+        CgaRenderer.Screen scr = ForecastWidget.screen(c);
+        assertNotNull("a failed refresh must not blank the last good forecast", scr.forecast);
+        assertForecastIsParsedDemoFixture(scr.forecast);
+        assertTrue(scr.statusIsError);
+        assertEquals("Could not refresh. Check your connection.", scr.status);
+        assertFalse(scr.demo);
+    }
+
+    // ---- a normal snapshot: parsed forecast, freshness status ----
+
+    @Test public void normalSnapshotParsesForecastAndShowsUpdatedStatus() {
+        Store s = new Store(c);
+        s.setSnapshot(DEMO_SNAPSHOT);
+        assertTrue(s.error().isEmpty());
+        CgaRenderer.Screen scr = ForecastWidget.screen(c);
+        assertForecastIsParsedDemoFixture(scr.forecast);
+        assertFalse(scr.statusIsError);
+        assertFalse(scr.demo);
+        assertTrue("status should be the 'Updated ...' freshness text, was: " + scr.status,
+            scr.status.startsWith("Updated"));
+    }
+
+    @Test public void placeLabelIsUppercasedFromStore() {
+        new Store(c).setPlaceLabel("Boston");
+        CgaRenderer.Screen scr = ForecastWidget.screen(c);
+        assertEquals("BOSTON", scr.place);
+    }
+
+    // ---- a corrupt stored snapshot must never crash the widget ----
+
+    @Test public void corruptSnapshotYieldsNullForecastInsteadOfCrashing() {
+        Store s = new Store(c);
+        s.setSnapshot("not json");
+        CgaRenderer.Screen scr = ForecastWidget.screen(c);
+        assertNull(scr.forecast);
+        assertFalse(scr.statusIsError);
+    }
+
+    // ---- checkedText wording, shared verbatim with MainActivity's status line ----
+
+    @Test public void checkedTextNeverCheckedYet() {
+        assertEquals("Not checked yet", ForecastWidget.checkedText(0));
+    }
+
+    @Test public void checkedTextJustNow() {
+        assertEquals("Updated just now", ForecastWidget.checkedText(System.currentTimeMillis()));
+    }
+
+    @Test public void checkedTextMinutesHoursDays() {
+        long now = System.currentTimeMillis();
+        assertEquals("Updated 5m ago", ForecastWidget.checkedText(now - 5 * 60_000L));
+        assertEquals("Updated 2h ago", ForecastWidget.checkedText(now - 2 * 3_600_000L));
+        assertEquals("Updated 3d ago", ForecastWidget.checkedText(now - 3 * 86_400_000L));
     }
 }
