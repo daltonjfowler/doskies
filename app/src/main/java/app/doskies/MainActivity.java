@@ -2,12 +2,16 @@ package app.doskies;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.os.Bundle;
+import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewParent;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -37,6 +41,9 @@ import java.util.List;
 public final class MainActivity extends Activity {
     private static final int LOCATION_PERMISSION_REQUEST = 1;
 
+    /** Update-notification tap sets this so onCreate scrolls to the Updates card. */
+    public static final String EXTRA_SHOW_UPDATES = "app.doskies.SHOW_UPDATES";
+
     private final int ink = Color.rgb(239, 245, 238);
     private final int muted = Color.rgb(173, 187, 178);
     private final int orange = Color.rgb(255, 186, 122);
@@ -57,9 +64,20 @@ public final class MainActivity extends Activity {
     Button refreshButton;
     TextView refreshStatus;
 
+    private ScrollView scrollRoot;
+    private LinearLayout updatesCard;
+    TextView updateStatus;
+    Button updateButton;
+    EditText updateUrlInput;
+    private Updater.Info pendingUpdate;
+    private boolean updateBusy;
+
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        Notifications.createChannels(this);
+        RefreshJob.scheduleUpdateCheck(this);
         render();
+        maybeScrollToUpdates();
 
         Store store = new Store(this);
         if ("auto".equals(store.mode()) && !Locator.hasLocationPermission(this)) {
@@ -84,6 +102,7 @@ public final class MainActivity extends Activity {
         Store s = new Store(this);
 
         ScrollView scroll = new ScrollView(this);
+        scrollRoot = scroll;
         scroll.setFillViewport(true);
         scroll.setBackgroundColor(bg);
         LinearLayout page = new LinearLayout(this);
@@ -100,6 +119,7 @@ public final class MainActivity extends Activity {
         buildLocationCard(page, s);
         buildDemoCard(page, s);
         buildAppearanceSeam(page);
+        buildUpdatesCard(page, s);
         buildAboutCard(page);
     }
 
@@ -218,6 +238,133 @@ public final class MainActivity extends Activity {
         text(box, getString(R.string.app_name) + " " + BuildConfig.VERSION_NAME, 14, ink, false);
         text(box, "No trackers, no ads, no account. Your location and settings stay on this device.", 12, muted, false);
         text(box, "Weather data by Open-Meteo, CC BY 4.0. See CREDITS.md.", 12, muted, false);
+    }
+
+    // ---- Phase 2: self-hosted updates -----------------------------------------
+
+    /** Mirrors the Cloudflare Usage Widget's update card: current version, a manual check, and
+     * (once available) a one-tap update that downloads, verifies, then hands off to the platform
+     * installer. Nothing downloads or installs without a tap here. */
+    private void buildUpdatesCard(LinearLayout page, Store s) {
+        pendingUpdate = null;
+        LinearLayout box = card(page);
+        updatesCard = box;
+        text(box, "UPDATES", 11, orange, false);
+        updateStatus = text(box, getString(R.string.update_you_have, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE), 13, muted, false);
+        button(box, getString(R.string.update_check), this::checkForUpdate);
+        updateButton = button(box, getString(R.string.update_button), this::startUpdate);
+        updateButton.setVisibility(View.GONE);
+        text(box, getString(R.string.update_source_label), 13, muted, false);
+        updateUrlInput = new EditText(this);
+        updateUrlInput.setSingleLine(true);
+        updateUrlInput.setTextColor(ink);
+        updateUrlInput.setTextSize(13);
+        updateUrlInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        updateUrlInput.setHint(R.string.update_source_hint);
+        updateUrlInput.setHintTextColor(muted);
+        updateUrlInput.setContentDescription("Update source URL");
+        updateUrlInput.setText(s.updateUrl());
+        box.addView(updateUrlInput, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+    }
+
+    /** Runs Updater.check off the main thread (Repository's shared executor), never in a test and
+     * never blocking the UI thread. Saves an edited update URL before checking. */
+    void checkForUpdate() {
+        pendingUpdate = null;
+        updateButton.setVisibility(View.GONE);
+        final String url = updateUrlInput.getText().toString().trim();
+        updateStatus.setText(getString(R.string.update_checking));
+        updateBusy = true;
+        Repository.IO.execute(() -> {
+            if (!url.isEmpty()) new Store(this).setUpdateUrl(url);
+            final String base = new Store(this).updateUrl();
+            final Updater.CheckResult r = Updater.check(BuildConfig.VERSION_CODE, base, new Updater.HttpSource());
+            runOnUiThread(() -> { updateBusy = false; if (isDestroyed()) return; renderCheck(r); });
+        });
+    }
+
+    void renderCheck(Updater.CheckResult r) {
+        switch (r.status) {
+            case AVAILABLE:
+                pendingUpdate = r.info;
+                String size = Updater.formatSize(r.info.size);
+                if (r.info.notes == null || r.info.notes.isEmpty()) {
+                    updateStatus.setText(getString(R.string.update_available_no_notes, r.info.versionName, r.info.versionCode, size));
+                } else {
+                    updateStatus.setText(getString(R.string.update_available, r.info.versionName, r.info.versionCode, size, r.info.notes));
+                }
+                updateButton.setEnabled(true);
+                updateButton.setVisibility(View.VISIBLE);
+                break;
+            case UP_TO_DATE: updateStatus.setText(R.string.update_latest); break;
+            case NO_NETWORK: updateStatus.setText(R.string.update_no_connection); break;
+            default: updateStatus.setText(R.string.update_bad_shape); break;
+        }
+    }
+
+    /** Tapping Update. GrapheneOS (and stock Android) gates installs from other apps; send the
+     * user to turn that on first when it is not yet allowed. */
+    void startUpdate() {
+        if (pendingUpdate == null) return;
+        if (!Updater.canInstall(this)) {
+            updateStatus.setText(R.string.update_needs_permission);
+            openUnknownSources();
+            return;
+        }
+        final Updater.Info info = pendingUpdate;
+        final String base = new Store(this).updateUrl();
+        updateBusy = true;
+        updateButton.setEnabled(false);
+        updateStatus.setText(getString(R.string.update_downloading, 0));
+        Repository.IO.execute(() -> {
+            final Updater.DownloadResult dr = Updater.download(getApplicationContext(), base, info, new Updater.HttpSource(),
+                pct -> runOnUiThread(() -> { if (!isDestroyed()) updateStatus.setText(getString(R.string.update_downloading, pct)); }));
+            runOnUiThread(() -> { if (isDestroyed()) return; onDownloadDone(dr); });
+        });
+    }
+
+    private void onDownloadDone(Updater.DownloadResult dr) {
+        switch (dr.status) {
+            case DONE:
+                updateStatus.setText(R.string.update_installing);
+                final java.io.File file = dr.file;
+                Repository.IO.execute(() -> {
+                    try {
+                        Updater.install(getApplicationContext(), file);
+                        updateBusy = false;
+                    } catch (Exception e) {
+                        runOnUiThread(() -> { updateBusy = false; if (isDestroyed()) return; updateStatus.setText(R.string.update_bad_shape); updateButton.setEnabled(true); });
+                    }
+                });
+                break;
+            case NO_NETWORK: updateBusy = false; updateStatus.setText(R.string.update_no_connection); updateButton.setEnabled(true); break;
+            case CHECKSUM_MISMATCH: updateBusy = false; updateStatus.setText(R.string.update_checksum_mismatch); updateButton.setEnabled(true); break;
+            default: updateBusy = false; updateStatus.setText(R.string.update_signature_mismatch); updateButton.setEnabled(true); break;
+        }
+    }
+
+    private void openUnknownSources() {
+        try {
+            startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
+        } catch (RuntimeException ignored) { }
+    }
+
+    /** The update notification opens here with EXTRA_SHOW_UPDATES set; scroll straight to the card. */
+    private void maybeScrollToUpdates() {
+        if (!getIntent().getBooleanExtra(EXTRA_SHOW_UPDATES, false)) return;
+        final ScrollView scroll = scrollRoot;
+        final LinearLayout target = updatesCard;
+        if (scroll == null || target == null) return;
+        scroll.post(() -> {
+            int y = 0;
+            View v = target;
+            while (v != null && v != scroll) {
+                y += v.getTop();
+                ViewParent parent = v.getParent();
+                v = (parent instanceof View) ? (View) parent : null;
+            }
+            scroll.smoothScrollTo(0, y);
+        });
     }
 
     // ---- wiring: each control's exact Store key + refresh ---------------------

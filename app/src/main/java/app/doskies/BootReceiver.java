@@ -10,6 +10,8 @@ public final class BootReceiver extends BroadcastReceiver {
         String action = intent.getAction();
         if (Intent.ACTION_BOOT_COMPLETED.equals(action) || Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
             RefreshJob.schedule(c);
+            RefreshJob.scheduleUpdateCheck(c);
+            Notifications.createChannels(c);
             ForecastWidget.updateAll(c);
         }
     }

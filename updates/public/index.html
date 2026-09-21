@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DOSkies — Download</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
+<style>
+  :root{
+    --panel:#101034; --edge:#55FFFF; --title:#FFFF55; --value:#FFFFFF;
+    --accent:#55FFFF; --dim:#AAAAAA; --faint:#555555; --good:#55FF55;
+    --pixel:'VT323','Courier New',monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    min-height:100vh; font-family:var(--pixel); color:var(--value);
+    background:radial-gradient(120% 90% at 50% -10%, #2a1730 0%, #170f22 45%, #0a0a12 100%);
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .win{
+    width:100%; max-width:440px; background:var(--panel); border:3px double var(--edge);
+    position:relative; box-shadow:0 12px 34px rgba(0,0,0,.55);
+  }
+  .win::after{ /* scanlines */
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background:repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0 1px, transparent 1px 3px);
+    mix-blend-mode:multiply;
+  }
+  .bar{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:3px 10px; border-bottom:1px solid rgba(85,255,255,.5); background:rgba(0,0,0,.18);
+  }
+  .bar .t{ font-size:22px; color:var(--title); letter-spacing:.02em; }
+  .bar .r{ font-size:19px; color:var(--accent); }
+  .body{ padding:16px 16px 18px; position:relative; }
+  h1{ margin:0 0 2px; font-weight:400; font-size:40px; line-height:.9; color:var(--value); }
+  h1 .sky{ color:var(--title); }
+  .tag{ margin:0 0 16px; font-size:20px; color:var(--accent); }
+  .glyph{ image-rendering:pixelated; display:block; margin:2px 0 10px; }
+  dl{ margin:0 0 16px; display:grid; grid-template-columns:auto 1fr; gap:2px 12px; font-size:20px; }
+  dl dt{ color:var(--title); }
+  dl dd{ margin:0; color:var(--value); word-break:break-all; }
+  dl dd.sha{ font-size:15px; color:var(--dim); }
+  .dl{
+    display:block; text-align:center; text-decoration:none; font-family:var(--pixel);
+    font-size:26px; letter-spacing:.02em; color:#04121a; background:var(--accent);
+    border:0; padding:12px 16px; cursor:pointer; margin:4px 0 6px;
+  }
+  .dl:hover{ background:var(--title); }
+  .dl:focus-visible{ outline:3px solid var(--title); outline-offset:2px; }
+  .note{ font-size:16px; color:var(--dim); line-height:1.4; margin:10px 0 0; }
+  .steps{ margin:14px 0 0; padding:0; list-style:none; font-size:18px; color:var(--value); }
+  .steps li{ padding:2px 0 2px 20px; position:relative; }
+  .steps li::before{ content:">"; position:absolute; left:2px; color:var(--accent); }
+  .priv{ font-size:16px; color:var(--good); margin:14px 0 0; }
+  a.src{ color:var(--accent); }
+</style>
+</head>
+<body>
+  <main class="win">
+    <div class="bar"><span class="t">DOSkies</span><span class="r">A:\DOWNLOAD</span></div>
+    <div class="body">
+      <h1>DOS<span class="sky">kies</span></h1>
+      <p class="tag">A weather widget that minds its own business.</p>
+
+      <svg class="glyph" width="72" height="72" viewBox="0 0 12 12" shape-rendering="crispEdges" aria-hidden="true">
+        <!-- pixel sun-behind-cloud, matching the widget's PARTLY glyph -->
+        <g fill="#FFFF55"><rect x="1" y="0" width="2" height="1"/><rect x="0" y="1" width="1" height="1"/><rect x="1" y="1" width="2" height="1"/><rect x="4" y="1" width="1" height="1"/><rect x="1" y="2" width="4" height="1"/><rect x="0" y="3" width="6" height="1"/><rect x="1" y="4" width="4" height="1"/><rect x="2" y="5" width="1" height="1"/></g>
+        <g fill="#FFFFFF"><rect x="7" y="3" width="3" height="1"/><rect x="6" y="4" width="5" height="1"/><rect x="5" y="5" width="7" height="1"/><rect x="3" y="6" width="9" height="1"/><rect x="2" y="7" width="10" height="1"/></g>
+        <g fill="#AAAAAA"><rect x="2" y="8" width="1" height="1"/><rect x="3" y="8" width="8" height="1"/><rect x="11" y="8" width="1" height="1"/><rect x="3" y="9" width="8" height="1"/></g>
+      </svg>
+
+      <dl>
+        <dt>Version</dt><dd id="ver">—</dd>
+        <dt>Size</dt><dd id="size">—</dd>
+        <dt>SHA-256</dt><dd class="sha" id="sha">—</dd>
+      </dl>
+
+      <a class="dl" id="download" href="DOSkies.apk" download>Download APK</a>
+      <p class="note" id="notes"></p>
+
+      <ul class="steps">
+        <li>Open the downloaded file</li>
+        <li>Allow installs from your browser if asked</li>
+        <li>Install, then add the DOSkies widget</li>
+      </ul>
+
+      <p class="priv">No trackers. No account. Talks only to Open-Meteo.</p>
+      <p class="note">Built for Android (GrapheneOS / Pixel). Free and open.</p>
+    </div>
+  </main>
+
+  <script>
+    // Fill version details from latest.json; the download button works regardless.
+    (function () {
+      function human(n){ if(!n && n!==0) return "—"; var kb=n/1024; return kb<1024 ? Math.round(kb)+" KB" : (kb/1024).toFixed(2)+" MB"; }
+      fetch("latest.json", { cache: "no-cache" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+        if (!j) return;
+        var v = document.getElementById("ver"); if (v) v.textContent = j.version_name ? ("v" + j.version_name + " (" + j.version_code + ")") : "—";
+        var s = document.getElementById("size"); if (s) s.textContent = human(j.size);
+        var h = document.getElementById("sha"); if (h && j.sha256) h.textContent = j.sha256;
+        var d = document.getElementById("download"); if (d && j.apk) d.setAttribute("href", j.apk);
+        var n = document.getElementById("notes"); if (n && j.notes) n.textContent = j.notes;
+      }).catch(function () {});
+    })();
+  </script>
+</body>
+</html>
