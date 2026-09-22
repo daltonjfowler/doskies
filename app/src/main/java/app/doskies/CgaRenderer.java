@@ -234,7 +234,11 @@ final class CgaRenderer {
         // 7 day columns
         float colsLeft = nowRight + 8f * d;
         float colW = (right - colsLeft) / 7f;
-        float line = Math.max(11f, availH / 4.8f);
+        float line = Math.max(11f, availH / 5.2f);
+        // Cap the glyph to the vertical room left after the four text rows (DOW + hi + lo + precip),
+        // so the precip row is never clipped. drawWide used a fixed 1.7*line glyph and availH/4.8
+        // rows, which summed taller than availH on wide panels and pushed precip off the bottom.
+        float gsz = Math.min(colW * 0.82f, Math.max(6f, availH - 4.35f * line - 2f * d));
         for (int i = 0; i < 7 && i < f.days.length; i++) {
             Forecast.Day day = f.days[i];
             float cx = colsLeft + colW * (i + 0.5f);
@@ -242,7 +246,6 @@ final class CgaRenderer {
             text.setColor(TITLE);
             drawCenter(cv, dow(day.date), cx, y + line, line);
             y += line + 1f * d;
-            float gsz = Math.min(colW * 0.82f, line * 1.7f);
             Glyphs.draw(cv, fill, day.code, cx - gsz / 2f, y, gsz);
             y += gsz + 1f * d;
             text.setColor(VALUE);

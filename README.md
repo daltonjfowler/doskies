@@ -13,12 +13,18 @@ Play services, no Fused Location, no runtime dependencies at all.
 
 ## Screenshots
 
-| The widget, at three sizes | Settings |
-|---|---|
-| ![DOSkies widget in its LARGE, MEDIUM and STRIP shapes](docs/screenshots/widget.png) | ![DOSkies settings screen](docs/screenshots/settings.png) |
+On a GrapheneOS Pixel 7 home screen — the wide seven-day row, sitting with the pixel wallpaper:
 
-*Rendered previews, drawn from the real look spec (palette, VT323 font, and the hand-authored glyph
-grids). On-device captures from the Pixel 7 will replace these.*
+![DOSkies on a Pixel 7 home screen](docs/screenshots/home.png)
+
+Every shape the one widget can take, and the settings screen:
+
+| The widget, at every size | Settings |
+|---|---|
+| ![DOSkies in its WIDE, LARGE, MEDIUM and STRIP shapes](docs/screenshots/widget.png) | ![DOSkies settings screen](docs/screenshots/settings.png) |
+
+*The home-screen photo is a real device capture. The size grid and settings are previews rendered
+from the look spec (palette, the bundled VT323 font, and the hand-authored glyph grids).*
 
 ## Features
 
