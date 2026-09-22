@@ -13,11 +13,12 @@ Play services, no Fused Location, no runtime dependencies at all.
 
 ## Screenshots
 
-<!-- Drop the images into docs/screenshots/ and they render here. -->
-
-| Widget (CGA panel) | Settings |
+| The widget, at three sizes | Settings |
 |---|---|
-| ![DOSkies widget on the home screen](docs/screenshots/widget.png) | ![DOSkies settings screen](docs/screenshots/settings.png) |
+| ![DOSkies widget in its LARGE, MEDIUM and STRIP shapes](docs/screenshots/widget.png) | ![DOSkies settings screen](docs/screenshots/settings.png) |
+
+*Rendered previews, drawn from the real look spec (palette, VT323 font, and the hand-authored glyph
+grids). On-device captures from the Pixel 7 will replace these.*
 
 ## Features
 
