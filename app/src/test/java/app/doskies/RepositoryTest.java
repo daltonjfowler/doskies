@@ -67,6 +67,7 @@ public class RepositoryTest {
         String url = Repository.buildUrl(42.42, -71.11, 'F');
         assertTrue(url.contains("relative_humidity_2m"));
         assertTrue(url.contains("wind_speed_10m"));
+        assertTrue(url.contains("wind_direction_10m"));
         assertTrue(url.contains("uv_index_max"));
     }
 

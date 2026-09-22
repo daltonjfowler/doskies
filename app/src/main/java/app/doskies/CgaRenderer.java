@@ -62,6 +62,7 @@ final class CgaRenderer {
         boolean statusIsError;  // draw status in BAD
         boolean demo;
         int opacity = 100;      // panel background opacity, 10..100 percent
+        int spin = -1;          // >=0 while a user refresh runs: rotates the refresh glyph (spinner)
     }
 
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -138,7 +139,7 @@ final class CgaRenderer {
         float iconR = size * 0.42f;
         float iconCx = right - iconR;
         float iconCy = top + size * 0.42f;
-        drawRefreshIcon(cv, iconCx, iconCy, iconR);
+        drawRefreshIcon(cv, iconCx, iconCy, iconR, scr.spin);
         float rx = iconCx - iconR - 4f * d;
         text.setColor(VALUE);
         drawRight(cv, scr.place, rx, baseline, size);
@@ -155,10 +156,16 @@ final class CgaRenderer {
         return ruleY;
     }
 
-    private void drawRefreshIcon(Canvas cv, float cx, float cy, float r) {
+    private void drawRefreshIcon(Canvas cv, float cx, float cy, float r, int spin) {
         stroke.setColor(ACCENT);
         stroke.setStrokeWidth(Math.max(1.4f, 1.6f * d));
         RectF arc = new RectF(cx - r, cy - r, cx + r, cy + r);
+        if (spin >= 0) {
+            // A refresh is running: draw a gapped ring whose gap sweeps round each frame, so the
+            // icon reads as a spinner. ForecastWidget repaints these frames while the fetch runs.
+            cv.drawArc(arc, (spin * 45f) % 360f, 270, false, stroke);
+            return;
+        }
         cv.drawArc(arc, 40, 280, false, stroke);
         // arrowhead near the arc's start (about 40 degrees)
         double a = Math.toRadians(40);
@@ -195,7 +202,7 @@ final class CgaRenderer {
             text.setColor(BAD);
             drawRight(cv, "!", right - size * 0.95f, baseline, size);
         }
-        drawRefreshIcon(cv, right - size * 0.5f, h / 2f, size * 0.42f);
+        drawRefreshIcon(cv, right - size * 0.5f, h / 2f, size * 0.42f, scr.spin);
     }
 
     // ---- WIDE: current on the left, 7 day columns across ----
@@ -234,11 +241,11 @@ final class CgaRenderer {
         // 7 day columns
         float colsLeft = nowRight + 8f * d;
         float colW = (right - colsLeft) / 7f;
-        float line = Math.max(11f, availH / 5.2f);
-        // Cap the glyph to the vertical room left after the four text rows (DOW + hi + lo + precip),
-        // so the precip row is never clipped. drawWide used a fixed 1.7*line glyph and availH/4.8
-        // rows, which summed taller than availH on wide panels and pushed precip off the bottom.
-        float gsz = Math.min(colW * 0.82f, Math.max(6f, availH - 4.35f * line - 2f * d));
+        // Text kept near the blessed size (availH/4.85); the day glyph gives up whatever vertical
+        // room is left after the four text rows (DOW + hi + lo + precip) so the precip row never
+        // clips. (drawWide used to size both independently and pushed precip off the bottom edge.)
+        float line = Math.max(11f, availH / 4.85f);
+        float gsz = Math.min(colW * 0.72f, Math.max(6f, availH - 4.3f * line - 2f * d));
         for (int i = 0; i < 7 && i < f.days.length; i++) {
             Forecast.Day day = f.days[i];
             float cx = colsLeft + colW * (i + 0.5f);
@@ -254,7 +261,7 @@ final class CgaRenderer {
             text.setColor(DIM);
             drawCenter(cv, day.lo + "°", cx, y + line, line);
             y += line;
-            text.setColor(day.precipChancePct >= 25 ? ACCENT : FAINT);
+            text.setColor(day.precipChancePct >= 25 ? ACCENT : DIM);
             drawCenter(cv, day.precipChancePct + "%", cx, y + line, line * 0.92f);
         }
     }
@@ -287,7 +294,7 @@ final class CgaRenderer {
         drawLeft(cv, Wmo.label(f.current.code), left + gsz + 6f * d, top + tsz * 0.9f + csz + 2f * d, csz);
         float y = top + gsz + 3f * d;
         // stats line
-        drawStatsRow(cv, f, left, y + csz, Math.max(12f, H * 0.06f));
+        drawStatsRow(cv, f, left, y + csz, Math.max(12f, H * 0.06f), right - left);
         y += csz + 6f * d;
         // status line (freshness / error)
         if (!scr.status.isEmpty()) {
@@ -321,7 +328,7 @@ final class CgaRenderer {
             tx = drawLeft(cv, " " + day.lo + "°", tx, base, rsz);
             String pct = day.precipChancePct + "%";
             float precipW = measure(pct, rsz);
-            text.setColor(day.precipChancePct >= 25 ? ACCENT : FAINT);
+            text.setColor(day.precipChancePct >= 25 ? ACCENT : DIM);
             drawRight(cv, pct, right, base, rsz);
             // The condition word fills the empty middle of a wide row; skipped if the row is too narrow.
             String cond = Wmo.label(day.code);
@@ -335,8 +342,18 @@ final class CgaRenderer {
 
     // ---- stats ----
 
-    private void drawStatsRow(Canvas cv, Forecast f, float x, float baseline, float size) {
+    private void drawStatsRow(Canvas cv, Forecast f, float x, float baseline, float size, float maxW) {
         Forecast.Current c = f.current;
+        String uvStr = c.uvMax < 0 ? "-- " : (c.uvMax + " " + uvBand(c.uvMax) + "  ");
+        String humStr = Forecast.Current.display(c.humidity) + (c.humidity < 0 ? "  " : "%  ");
+        String dir = Forecast.windCompass(c.windDir);
+        String windStr = c.wind < 0 ? "--" : (c.wind + " " + c.windUnit + (dir.isEmpty() ? "" : " " + dir));
+        // Scale the whole line down if it would run past the panel edge (adding the wind direction
+        // made it wider). Mirrors drawStatsStacked's fit-to-width.
+        if (maxW > 0) {
+            float w = measure("UV " + uvStr + "HUM " + humStr + "WIND " + windStr, size);
+            if (w > maxW) size *= maxW / w;
+        }
         x = seg(cv, "UV ", x, baseline, size, TITLE);
         if (c.uvMax < 0) {
             x = seg(cv, "-- ", x, baseline, size, FAINT);
@@ -345,18 +362,19 @@ final class CgaRenderer {
             x = seg(cv, uvBand(c.uvMax) + "  ", x, baseline, size, uvColor(c.uvMax));
         }
         x = seg(cv, "HUM ", x, baseline, size, TITLE);
-        x = seg(cv, Forecast.Current.display(c.humidity) + (c.humidity < 0 ? "  " : "%  "), x, baseline, size, VALUE);
+        x = seg(cv, humStr, x, baseline, size, VALUE);
         x = seg(cv, "WIND ", x, baseline, size, TITLE);
-        String wind = c.wind < 0 ? "--" : (c.wind + " " + c.windUnit);
-        seg(cv, wind, x, baseline, size, VALUE);
+        seg(cv, windStr, x, baseline, size, VALUE);
     }
 
     private void drawStatsStacked(Canvas cv, Forecast f, float x, float top, float size, float maxW) {
         Forecast.Current c = f.current;
         // Scale down so the widest stat line fits the now-block width (maxW).
+        String dir = Forecast.windCompass(c.windDir);
+        String windVal = c.wind < 0 ? "--" : (c.wind + " " + c.windUnit + (dir.isEmpty() ? "" : " " + dir));
         String uvLine = "UV " + (c.uvMax < 0 ? "--" : (c.uvMax + " " + uvBand(c.uvMax)));
         String humLine = "HUM " + (c.humidity < 0 ? "--" : (c.humidity + "%"));
-        String windLine = "WIND " + (c.wind < 0 ? "--" : (c.wind + " " + c.windUnit));
+        String windLine = "WIND " + windVal;
         float widest = Math.max(measure(uvLine, size), Math.max(measure(humLine, size), measure(windLine, size)));
         if (maxW > 0 && widest > maxW) size *= maxW / widest;
         float y = top + size;
@@ -368,7 +386,7 @@ final class CgaRenderer {
         seg(cv, Forecast.Current.display(c.humidity) + (c.humidity < 0 ? "" : "%"), xx, y, size, VALUE);
         y += size + 1f * d;
         xx = seg(cv, "WIND ", x, y, size, TITLE);
-        seg(cv, c.wind < 0 ? "--" : (c.wind + " " + c.windUnit), xx, y, size, VALUE);
+        seg(cv, windVal, xx, y, size, VALUE);
     }
 
     /** Draws one left-aligned colored segment at (x, baseline); returns the x after it. */

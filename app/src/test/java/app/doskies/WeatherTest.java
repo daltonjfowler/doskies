@@ -15,7 +15,7 @@ public class WeatherTest {
     private static final String FIXTURE = "{"
         + "\"latitude\":42.42,\"longitude\":-71.11,"
         + "\"current\":{\"time\":\"2026-09-20T14:00\",\"temperature_2m\":71.4,\"weather_code\":2,\"precipitation\":0.0,"
-        + "\"relative_humidity_2m\":64,\"wind_speed_10m\":11.6},"
+        + "\"relative_humidity_2m\":64,\"wind_speed_10m\":11.6,\"wind_direction_10m\":48},"
         + "\"daily\":{"
         + "\"time\":[\"2026-09-20\",\"2026-09-21\",\"2026-09-22\",\"2026-09-23\",\"2026-09-24\",\"2026-09-25\",\"2026-09-26\"],"
         + "\"weather_code\":[2,3,61,63,0,95,71],"
@@ -39,7 +39,19 @@ public class WeatherTest {
         assertEquals(64, f.current.humidity);
         assertEquals(12, f.current.wind); // 11.6 rounds up
         assertEquals("mph", f.current.windUnit);
+        assertEquals(48, f.current.windDir);
+        assertEquals("NE", Forecast.windCompass(f.current.windDir)); // 48 deg -> NE
         assertEquals(5, f.current.uvMax); // today's uv_index_max[0] 5.4 rounds down
+    }
+
+    @Test public void windCompassMapsBearingsToEightPoints() {
+        assertEquals("N", Forecast.windCompass(0));
+        assertEquals("N", Forecast.windCompass(360));
+        assertEquals("E", Forecast.windCompass(90));
+        assertEquals("S", Forecast.windCompass(179));
+        assertEquals("W", Forecast.windCompass(270));
+        assertEquals("NW", Forecast.windCompass(315));
+        assertEquals("", Forecast.windCompass(Forecast.UNKNOWN)); // no reading -> no label
     }
 
     @Test public void windUnitFollowsCelsius() throws Exception {
@@ -50,11 +62,12 @@ public class WeatherTest {
     @Test public void optionalCurrentFieldsAreUnknownWhenAbsentAndNeverThrow() throws Exception {
         // No relative_humidity_2m, no wind_speed_10m, no uv_index_max at all: still a valid parse.
         String noExtras = FIXTURE
-            .replace(",\"relative_humidity_2m\":64,\"wind_speed_10m\":11.6", "")
+            .replace(",\"relative_humidity_2m\":64,\"wind_speed_10m\":11.6,\"wind_direction_10m\":48", "")
             .replace(",\"uv_index_max\":[5.4,4.8,2.1,1.0,6.7,3.3,0.0]", "");
         Forecast f = Weather.parse(noExtras, 'F');
         assertEquals(Forecast.UNKNOWN, f.current.humidity);
         assertEquals(Forecast.UNKNOWN, f.current.wind);
+        assertEquals(Forecast.UNKNOWN, f.current.windDir);
         assertEquals(Forecast.UNKNOWN, f.current.uvMax);
         // The required fields are untouched by the missing optionals.
         assertEquals(71, f.current.temp);
@@ -64,11 +77,12 @@ public class WeatherTest {
 
     @Test public void optionalCurrentFieldsAreUnknownWhenNullAndNeverThrow() throws Exception {
         String nulled = FIXTURE
-            .replace("\"relative_humidity_2m\":64,\"wind_speed_10m\":11.6", "\"relative_humidity_2m\":null,\"wind_speed_10m\":null")
+            .replace("\"relative_humidity_2m\":64,\"wind_speed_10m\":11.6,\"wind_direction_10m\":48", "\"relative_humidity_2m\":null,\"wind_speed_10m\":null,\"wind_direction_10m\":null")
             .replace("\"uv_index_max\":[5.4,4.8,2.1,1.0,6.7,3.3,0.0]", "\"uv_index_max\":[null,4.8,2.1,1.0,6.7,3.3,0.0]");
         Forecast f = Weather.parse(nulled, 'F');
         assertEquals(Forecast.UNKNOWN, f.current.humidity);
         assertEquals(Forecast.UNKNOWN, f.current.wind);
+        assertEquals(Forecast.UNKNOWN, f.current.windDir);
         assertEquals(Forecast.UNKNOWN, f.current.uvMax);
     }
 
@@ -127,6 +141,8 @@ public class WeatherTest {
         assertEquals(5, cur.uvMax);
         assertEquals(8, cur.wind);
         assertEquals("mph", cur.windUnit);
+        assertEquals(315, cur.windDir);
+        assertEquals("NW", Forecast.windCompass(cur.windDir));
     }
 
     // ---- malformed responses must throw, never silently coerce to zeros ----

@@ -84,9 +84,14 @@ public final class RefreshJob extends JobService {
             Repository.IO.execute(task);
             return true;
         }
+        final Context app = getApplicationContext();
+        // Spin the widget's refresh glyph only for a user-tapped refresh (NOW), never the silent
+        // periodic one, and not in demo mode (no fetch happens there).
+        final boolean userInitiated = params.getJobId() == NOW_JOB_ID;
+        if (userInitiated && !new Store(app).demo()) ForecastWidget.startSpin(app);
         FutureTask<Void> task = new FutureTask<>(() -> {
-            boolean ok = Repository.refresh(getApplicationContext());
-            ForecastWidget.updateAll(getApplicationContext());
+            boolean ok = Repository.refresh(app);
+            if (userInitiated) ForecastWidget.stopSpin(app); else ForecastWidget.updateAll(app);
             if (tasks.remove(params) != null) jobFinished(params, !ok);
             return null;
         });

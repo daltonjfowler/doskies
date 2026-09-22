@@ -28,7 +28,7 @@ final class Repository {
         boolean celsius = unit == 'C';
         return String.format(Locale.US,
             "https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s"
-                + "&current=temperature_2m,weather_code,precipitation,relative_humidity_2m,wind_speed_10m"
+                + "&current=temperature_2m,weather_code,precipitation,relative_humidity_2m,wind_speed_10m,wind_direction_10m"
                 + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max"
                 + "&temperature_unit=%s&precipitation_unit=%s&wind_speed_unit=%s&timezone=auto&forecast_days=7",
             lat, lon, celsius ? "celsius" : "fahrenheit", celsius ? "mm" : "inch", celsius ? "kmh" : "mph");

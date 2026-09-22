@@ -8,6 +8,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.widget.RemoteViews;
 import java.util.Locale;
@@ -27,6 +29,36 @@ public final class ForecastWidget extends AppWidgetProvider {
     private static final String REFRESH = "app.doskies.REFRESH";
     /** Cap the rendered bitmap so a very large widget cannot exceed the RemoteViews bitmap limit. */
     private static final int MAX_BITMAP_PX = 1600;
+
+    // Refresh spinner. A home-screen widget cannot run a smooth animation, so while a user-tapped
+    // refresh is in flight we repaint the widget every ~170ms with the refresh glyph rotated one
+    // step (see CgaRenderer.drawRefreshIcon), which reads as a spinning ring. Driven from RefreshJob
+    // (the job keeps the process alive); it stops when the fetch finishes or hits a safety cap.
+    private static final Handler SPIN = new Handler(Looper.getMainLooper());
+    static volatile int spinFrame = -1; // -1 = not spinning; >=0 = current rotation step
+
+    /** Begins the spinner (call on the main thread; RefreshJob does, from onStartJob). */
+    static void startSpin(Context c) {
+        final Context app = c.getApplicationContext();
+        SPIN.removeCallbacksAndMessages(null);
+        spinFrame = 0;
+        updateAll(app);
+        SPIN.postDelayed(new Runnable() {
+            @Override public void run() {
+                if (spinFrame < 0) return;
+                spinFrame++;
+                if (spinFrame > 70) { spinFrame = -1; updateAll(app); return; } // ~12s safety cap
+                updateAll(app);
+                SPIN.postDelayed(this, 170);
+            }
+        }, 170);
+    }
+
+    /** Ends the spinner and paints the final, real state. Safe to call from any thread. */
+    static void stopSpin(Context c) {
+        final Context app = c.getApplicationContext();
+        SPIN.post(() -> { SPIN.removeCallbacksAndMessages(null); spinFrame = -1; updateAll(app); });
+    }
 
     @Override public void onUpdate(Context c, AppWidgetManager m, int[] ids) {
         for (int id : ids) m.updateAppWidget(id, build(c, m, id));
@@ -114,6 +146,7 @@ public final class ForecastWidget extends AppWidgetProvider {
         Store s = new Store(c);
         CgaRenderer.Screen scr = new CgaRenderer.Screen();
         scr.opacity = s.widgetOpacity();
+        scr.spin = spinFrame; // >=0 while a user refresh is running: draw the spinner frame
 
         if (s.demo()) {
             scr.place = s.placeLabel().toUpperCase(Locale.US);

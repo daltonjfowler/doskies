@@ -39,6 +39,7 @@ public final class Weather {
         // and never coerced to 0 (0 is itself a valid humidity/UV/wind reading).
         int humidity = optRoundedInt(current, "relative_humidity_2m");
         int wind = optRoundedInt(current, "wind_speed_10m");
+        int windDir = optRoundedInt(current, "wind_direction_10m");
         String windUnit = unit == 'C' ? "km/h" : "mph";
 
         JSONArray time = daily.optJSONArray("time");
@@ -64,7 +65,7 @@ public final class Weather {
             int code = codes.getInt(i);
             days[i] = new Forecast.Day(date, hi, lo, pop, code);
         }
-        Forecast.Current cur = new Forecast.Current(curTemp, curCode, curPrecip, humidity, uvMax, wind, windUnit);
+        Forecast.Current cur = new Forecast.Current(curTemp, curCode, curPrecip, humidity, uvMax, wind, windUnit, windDir);
         return new Forecast(unit, cur, days);
     }
 
@@ -83,7 +84,7 @@ public final class Weather {
             new Forecast.Day("2026-09-25", 72, 59, 90, 95),
             new Forecast.Day("2026-09-26", 40, 29, 40, 71),
         };
-        return new Forecast('F', new Forecast.Current(71, 1, 0.0, 78, 5, 8, "mph"), days);
+        return new Forecast('F', new Forecast.Current(71, 1, 0.0, 78, 5, 8, "mph", 315), days);
     }
 
     private static int round(double v) { return (int) Math.round(v); }
