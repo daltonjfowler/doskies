@@ -6,8 +6,11 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
@@ -64,6 +67,17 @@ public final class MainActivity extends Activity {
     TextView freshnessLabel;
     Button refreshButton;
     TextView refreshStatus;
+
+    // Refresh feedback: a DOS-style spinner that runs while a manual refresh is in flight, and a
+    // poll of Store that ends it honestly (checked() advances on success, error() appears on
+    // failure). No fake "done" -- the spinner stops only when the real refresh does (or times out).
+    private static final String[] SPINNER = { "|", "/", "-", "\\" };
+    private final Handler ui = new Handler(Looper.getMainLooper());
+    private boolean refreshing;
+    private int spinTick;
+    private long refreshCheckedBefore;
+    private String refreshErrorBefore = "";
+    private long refreshStartMs;
 
     private ScrollView scrollRoot;
     private LinearLayout updatesCard;
@@ -130,11 +144,95 @@ public final class MainActivity extends Activity {
         statusLabel = text(box, "", 16, ink, true);
         freshnessLabel = text(box, "", 13, muted, false);
         refreshStatus = text(box, "", 13, muted, false);
-        refreshButton = button(box, "Refresh now", () -> {
-            refreshStatus.setText("Refreshing...");
-            RefreshJob.now(this);
-        });
+        refreshButton = button(box, "Refresh now", this::onRefreshTapped);
         renderStatus();
+    }
+
+    /**
+     * Manual refresh with visible feedback. Every tap gives an instant cue (a quick button bounce,
+     * plus the pressed-state fill on the pill itself); a real fetch then shows a DOS spinner until
+     * it actually finishes. The initial "Refreshing..." text is set synchronously (a test pins it)
+     * before the animated spinner takes over on the next handler tick.
+     */
+    void onRefreshTapped() {
+        bounce(refreshButton);
+        if (refreshing) return; // a refresh is already in flight; ignore the extra tap
+        refreshStatus.setText("Refreshing...");
+        Store s = new Store(this);
+        if (s.demo()) {
+            // Demo mode makes no network call; acknowledge honestly instead of faking an update.
+            RefreshJob.now(this);
+            ui.postDelayed(() -> {
+                if (!isDestroyed()) refreshStatus.setText("Demo mode - not fetching live data.");
+            }, 400);
+            return;
+        }
+        refreshing = true;
+        refreshButton.setEnabled(false);
+        refreshCheckedBefore = s.checked();
+        refreshErrorBefore = s.error();
+        refreshStartMs = System.currentTimeMillis();
+        spinTick = 0;
+        RefreshJob.now(this);
+        ui.postDelayed(spinRunnable, 130);
+        ui.postDelayed(pollRunnable, 250);
+    }
+
+    private final Runnable spinRunnable = new Runnable() {
+        @Override public void run() {
+            if (!refreshing || isDestroyed()) return;
+            refreshStatus.setText("Refreshing " + SPINNER[spinTick % SPINNER.length]);
+            spinTick++;
+            ui.postDelayed(this, 130);
+        }
+    };
+
+    private final Runnable pollRunnable = new Runnable() {
+        @Override public void run() {
+            if (!refreshing || isDestroyed()) return;
+            Store s = new Store(MainActivity.this);
+            boolean succeeded = s.checked() != refreshCheckedBefore && s.error().isEmpty();
+            boolean failed = !s.error().isEmpty() && !s.error().equals(refreshErrorBefore);
+            boolean timedOut = System.currentTimeMillis() - refreshStartMs > 15000;
+            if (succeeded || failed || timedOut) {
+                finishRefresh(succeeded);
+            } else {
+                ui.postDelayed(this, 200);
+            }
+        }
+    };
+
+    /** Stops the spinner and re-enables the button. On success a brief tick, then the line clears;
+     *  on failure the error already shows on the freshness line, so just clear the spinner line. */
+    private void finishRefresh(boolean succeeded) {
+        refreshing = false;
+        ui.removeCallbacks(spinRunnable);
+        ui.removeCallbacks(pollRunnable);
+        if (isDestroyed()) return;
+        refreshButton.setEnabled(true);
+        renderStatus();
+        if (succeeded) {
+            refreshStatus.setText("Updated just now.");
+            ui.postDelayed(() -> {
+                if (!isDestroyed() && !refreshing) refreshStatus.setText("");
+            }, 2500);
+        } else {
+            refreshStatus.setText("");
+        }
+    }
+
+    /** A quick scale-in so a tap is felt even before anything else changes. */
+    private void bounce(View v) {
+        v.animate().cancel();
+        v.setScaleX(0.94f);
+        v.setScaleY(0.94f);
+        v.animate().scaleX(1f).scaleY(1f).setDuration(160).start();
+    }
+
+    @Override protected void onDestroy() {
+        ui.removeCallbacks(spinRunnable);
+        ui.removeCallbacks(pollRunnable);
+        super.onDestroy();
     }
 
     private void buildUnitsCard(LinearLayout page, Store s) {
@@ -585,10 +683,26 @@ public final class MainActivity extends Activity {
         return d;
     }
 
-    private GradientDrawable pill(int color) {
+    /** A rounded pill that lightens while pressed, so a tap shows even though the custom background
+     *  replaces Android's default button ripple. Used by every button on the screen. */
+    private StateListDrawable pill(int color) {
+        StateListDrawable sld = new StateListDrawable();
+        sld.addState(new int[] { android.R.attr.state_pressed }, roundRect(lighten(color, 0.22f)));
+        sld.addState(new int[] {}, roundRect(color));
+        return sld;
+    }
+
+    private GradientDrawable roundRect(int color) {
         GradientDrawable d = new GradientDrawable();
         d.setColor(color);
         d.setCornerRadius(dp(12));
         return d;
+    }
+
+    private static int lighten(int c, float f) {
+        int r = Math.round(Color.red(c) + (255 - Color.red(c)) * f);
+        int g = Math.round(Color.green(c) + (255 - Color.green(c)) * f);
+        int b = Math.round(Color.blue(c) + (255 - Color.blue(c)) * f);
+        return Color.rgb(Math.min(255, r), Math.min(255, g), Math.min(255, b));
     }
 }

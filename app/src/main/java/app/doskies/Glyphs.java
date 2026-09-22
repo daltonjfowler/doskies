@@ -68,10 +68,12 @@ final class Glyphs {
 
     // ---- the ten grids (12 rows x 12 chars), transcribed verbatim from docs/T5-LOOK-SPEC.md ----
 
+    // Pulled in by a cell all round (rays no longer touch the edges) so the sun reads a touch
+    // smaller and sits better beside the cloud glyphs. Kept symmetric; disc cols 3-8.
     private static final String[] CLEAR = {
-        "     YY     ", "  Y      Y  ", "    YYYY    ", "  YYYYYYYY  ", "  YYYYYYYY  ",
-        "Y YYYYYYYY Y", "Y YYYYYYYY Y", "  YYYYYYYY  ", "  YYYYYYYY  ", "    YYYY    ",
-        "  Y      Y  ", "     YY     "
+        "            ", "     YY     ", "   Y    Y   ", "    YYYY    ", "   YYYYYY   ",
+        " Y YYYYYY Y ", " Y YYYYYY Y ", "   YYYYYY   ", "    YYYY    ", "   Y    Y   ",
+        "     YY     ", "            "
     };
     private static final String[] PARTLY = {
         " YY         ", "Y YY Y      ", " YYYY       ", "YYYYYY WWW  ", " YYYY WWWWW ",

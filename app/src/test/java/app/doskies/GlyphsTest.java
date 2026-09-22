@@ -42,11 +42,16 @@ public class GlyphsTest {
     }
 
     @Test public void clearGlyphHasItsSpecCells() {
-        // CLEAR row 5 is "Y YYYYYYYY Y": a west ray at col 0, a gap at col 1, the solid disc from col 2.
+        // CLEAR row 5 is " Y YYYYYY Y ": a 1-cell margin (the shrunk sun no longer touches the
+        // edge), the west ray at col 1, a gap at col 2, then the solid disc from col 3.
         String[] clear = Glyphs.grid(Wmo.Condition.CLEAR);
-        assertEquals('Y', clear[5].charAt(0));
-        assertEquals(' ', clear[5].charAt(1));
-        assertEquals('Y', clear[5].charAt(2));
+        assertEquals(' ', clear[5].charAt(0));
+        assertEquals('Y', clear[5].charAt(1));
+        assertEquals(' ', clear[5].charAt(2));
+        assertEquals('Y', clear[5].charAt(3));
+        // Top and bottom rows are now empty margin, proving the pull-in.
+        assertEquals("            ", clear[0]);
+        assertEquals("            ", clear[11]);
     }
 
     @Test public void codeSelectionUsesConditionNotGlyphBucket() {

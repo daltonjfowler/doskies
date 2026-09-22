@@ -50,10 +50,10 @@ YY YYYYYY YY           WWWWWWWWW       WWWWWWWWWWWW        GGGGGGGGGGGG
 
 Exact rows (12 chars each), authoritative:
 
-CLEAR:
-`     YY     ` / `  Y  YY  Y  ` / `   YYYYYY   ` / `  YYYYYYYY  ` / ` YYYYYYYYYY ` /
-`YY YYYYYY YY` / `YY YYYYYY YY` / ` YYYYYYYYYY ` / `  YYYYYYYY  ` / `   YYYYYY   ` /
-`  Y  YY  Y  ` / `     YY     `
+CLEAR (pulled in one cell all round so the sun reads a touch smaller; disc cols 3-8):
+`            ` / `     YY     ` / `   Y    Y   ` / `    YYYY    ` / `   YYYYYY   ` /
+` Y YYYYYY Y ` / ` Y YYYYYY Y ` / `   YYYYYY   ` / `    YYYY    ` / `   Y    Y   ` /
+`     YY     ` / `            `
 
 PARTLY:
 ` YY         ` / `Y YY Y      ` / ` YYYY       ` / `YYYYYY WWW  ` / ` YYYY WWWWW ` /
