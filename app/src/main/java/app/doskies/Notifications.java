@@ -47,7 +47,7 @@ final class Notifications {
         }
         createChannels(ctx);
         Notification n = new Notification.Builder(ctx, CH_STATUS)
-            .setSmallIcon(R.drawable.ic_doskies)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(ctx.getString(R.string.update_notif_title, versionName, versionCode))
             .setAutoCancel(true)
             .setContentIntent(updateContentIntent(ctx))
